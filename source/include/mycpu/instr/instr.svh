@@ -1,0 +1,71 @@
+`ifndef __INSTR_SVH__
+`define __INSTR_SVH__
+
+`include "common.svh"
+`include "../mycommon.svh"
+
+typedef i5 creg_addr_t;
+
+typedef enum i8 {
+	NOP,
+    SLL,
+    SRL,
+    SRA,
+    SLLV,
+    SRLV,
+    SRAV,
+    JR,
+    JALR,
+    SYSCALL,
+    BREAK,
+    MFHI,
+    MFLO,
+    MTHI,
+    MTLO,
+    MULT,
+    MULTU,
+    DIV,
+    DIVU,
+    ADD,
+    ADDU,
+    SUB,
+    SUBU,
+    AND,
+    OR,
+    XOR,
+    NOR,
+    SLT,
+    SLTU,
+	BLTZ,
+	BGEZ,
+	BLTZAL,
+	BGEZAL,
+	J,
+	JAL,
+	BEQ,
+	BNE,
+	BLEZ,
+	BGTZ,
+	ADDI,
+	ADDIU,
+	SLTI,
+	SLTIU,
+	ANDI,
+	ORI,
+	XORI,
+	LUI,
+	MFC0,
+	MTC0,
+	ERET,
+	LB,
+	LH,
+	LW,
+	LBU,
+	LHU,
+	SB,
+	SH,
+	SW,
+	DECODE_ERROR
+} op_t;
+
+`endif

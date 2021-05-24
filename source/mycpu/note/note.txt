@@ -1,0 +1,144 @@
+Register					000000 sssss ttttt ddddd aaaaa ffffff
+Immediate					oooooo sssss ttttt iiiii iiiii iiiiii
+Jump						oooooo iiiii iiiii iiiii iiiii iiiiii
+
+
+s=instr[25:21]
+t=instr[20:16]
+d=instr[15:11]
+a=instr[10:6]
+f=instr[5:0]
+i=instr[15:0]
+j=instr[25:0]
+
+
+0000 F = A & B
+0001 F = A | B
+0010 F = A + B
+0011 F = A << B
+0100 F = A >> B
+0101 F = A >>> B
+0110 F = A - B
+0111 F = A < B
+1000 
+1001 F = A ^ B
+1010 F = A + B without overflow
+1011 
+1100 F = ~(A | B)
+1100 
+1101 
+1110 F = A - B without overflow 
+1111 F = unsigned A < unsigned B
+
+
+流水线阶段状态：
+0	nop			正常
+1	stall		阻塞
+2	bubble		冒泡
+3	error		故障
+
+fdem  阶段添加 _m_addr _m_read   _m_write  _m_data，表示M阶段需要读取
+
+fdemw 阶段添加 _w_reg  _w_enable _w_data  ，表示W阶段需要写入
+
+
+转发可以解决的：
+E阶段计算的信息转发给D阶段 此时E阶段的指令最终需要写入，且目标寄存器为D阶段读取的寄存器
+M阶段读取的信息转发给D阶段 此时M阶段的指令最终需要写入，且目标寄存器为D阶段读取的寄存器
+W阶段存储的信息转发给D阶段 此时W阶段的指令最终需要写入，且目标寄存器为D阶段读取的寄存器
+
+
+
+加载使用冒险：
+E阶段的指令会在M阶段读取信息，但D阶段已经需要使用，则需要stall。
+
+此时E阶段的指令为内存读取类型指令，且最终需要写入，
+且目标寄存器为D阶段读取的寄存器。
+
+此时：
+当前周期将F阶段设置为阻塞状态。
+即在下一个时钟上升沿，正常输出，但PC不变。
+
+当前周期将D阶段设置为冒泡状态。
+即在下一个时钟上升沿，存入空信息。
+
+分支预测失败：
+呃好像不需要预测吧。
+不过数据冲突是什么？PC+8？
+
+
+nop							000000 00000 00000 00000 00000 000000
+sll		[d]=[t]<<a			000000 00000 ttttt ddddd aaaaa 000000
+srl		[d]=[t]>>a			000000 00000 ttttt ddddd aaaaa 000010 逻辑右移，零补全
+sra		[d]=[t]>>>a			000000 00000 ttttt ddddd aaaaa 000011 算术右移，符号补全
+
+sllv	ve=vt<<<vs[4::0]	000000 sssss ttttt ddddd 00000 000100
+srlv	ve=vt<<<vs[4::0]	000000 sssss ttttt ddddd 00000 000110 逻辑右移
+srav	ve=vt>>>vs[4::0]	000000 sssss ttttt ddddd 00000 000111 算术右移
+
+jr		PC=[s]				000000 sssss 00000 00000 00000 001000
+jalr	[d]=PC+8, PC=[s]	000000 sssss 00000 ddddd 00000 001001 为何+8请参考收藏夹stackoverflow 	delay slot
+
+mfhi	[d] = [HI]			000000 00000 00000 ddddd 00000 010000
+mflo	[d] = [LO]			000000 00000 00000 ddddd 00000 010010
+mthi	[HI] = [s]			000000 sssss 00000 00000 00000 010001
+mtlo	[LO] = [s]			000000 sssss 00000 00000 00000 010011
+mult	(HI,LO) = [s]*[t]	000000 sssss ttttt 00000 00000 011000 HI是高位
+multu	(HI,LO) = [s]*[t]	000000 sssss ttttt 00000 00000 011001 HI是高位
+div		(HI,LO)=[s]/[t]		000000 sssss ttttt 00000 00000 011010 有符号除
+divu	(HI,LO)=[s]/[t]		000000 sssss ttttt 00000 00000 011011 无符号除
+
+add		[d]=[s]+[t]			000000 sssss ttttt ddddd 00000 100000
+addu	[d]=[s]+[t]			000000 sssss ttttt ddddd 00000 100001 不考虑overflow
+sub		[d]=[s]-[t]			000000 sssss ttttt ddddd 00000 100010
+subu	[d]=[s]-[t]			000000 sssss ttttt ddddd 00000 100011 不考虑overflow
+and		[d]=[s]&[t]			000000 sssss ttttt ddddd 00000 100100
+or		[d]=[s]|[t]			000000 sssss ttttt ddddd 00000 100101
+xor		[d]=[s]^[t]			000000 sssss ttttt ddddd 00000 100110
+nor		[d]=~([s]|[t])		000000 sssss ttttt ddddd 00000 100111
+slt		[d]=[s]<[t]?1:0		000000 sssss ttttt ddddd 00000 101010
+sltu	[d]=[s]<[t]?1:0		000000 sssss ttttt ddddd 00000 101011 无符号比较
+
+
+bltz	PC=(vs<0)?PC_j:p+4  000001 sssss 00000 iiiii iiiii iiiiii 符号扩展i
+bgez	PC=(vs>=0)?PC_j:p+4	000001 sssss 00001 iiiii iiiii iiiiii 符号扩展i
+bltzal	PC=(vs<0)?PC_j:p+4  000001 sssss 10000 iiiii iiiii iiiiii 符号扩展i [31]
+bgezal	PC=(vs>=0)?PC_j:p+4	000001 sssss 10001 iiiii iiiii iiiiii 符号扩展i [31]
+
+j		PC={PC[31:28],i,00}	000010 iiiii iiiii iiiii iiiii iiiiii 
+jal		$ra=PC+8, PC=JTA	000011 iiiii iiiii iiiii iiiii iiiiii 为何+8请参考收藏夹stackoverflow
+
+beq		PC+=[s]==[t]?(i<<2)	000100 sssss ttttt iiiii iiiii iiiiii 符号扩展i
+bne		PC+=[s]!=[t]?(i<<2)	000101 sssss ttttt iiiii iiiii iiiiii 符号扩展i
+
+blez	PC=(vs<=0)?PC_j:p+4	000110 sssss 00000 iiiii iiiii iiiiii 符号扩展i
+bgtz	PC=(vs>0)?PC_j:p+4  000111 sssss 00000 iiiii iiiii iiiiii 符号扩展i
+
+addi	[t]=[s]+i			001000 sssss ttttt iiiii iiiii iiiiii 符号扩展i，需要考虑overflow
+addiu	[t]=[s]+i			001001 sssss ttttt iiiii iiiii iiiiii 符号扩展i。其中addiu的u并非unsigned，而指不需要考虑overflow。
+slti	[t]=[s]<i?1:0		001010 sssss ttttt iiiii iiiii iiiiii 符号扩展i
+sltiu	[t]=[s]<i?1:0		001011 sssss ttttt iiiii iiiii iiiiii 符号扩展i
+andi	[t]=[s]&i			001100 sssss ttttt iiiii iiiii iiiiii 零扩展i
+ori		[t]=[s]|i			001101 sssss ttttt iiiii iiiii iiiiii 零扩展i
+xori	[t]=[s]^i			001110 sssss ttttt iiiii iiiii iiiiii 零扩展i
+lui		[t]=i<<16			001111 00000 ttttt iiiii iiiii iiiiii
+
+lb		[t]=[i(s)] byte		100000 sssss ttttt iiiii iiiii iiiiii 符号扩展i，结果符号扩展
+lh		[t]=[i(s)] byte		100001 sssss ttttt iiiii iiiii iiiiii 符号扩展i，结果符号扩展
+
+lw		[t]=[i(s)]			100011 sssss ttttt iiiii iiiii iiiiii 符号扩展i
+
+lbu		[t]=[i(s)] byte		100100 sssss ttttt iiiii iiiii iiiiii 符号扩展i，结果零扩展
+lhu		[t]=[i(s)] byte		100101 sssss ttttt iiiii iiiii iiiiii 符号扩展i，结果零扩展
+
+sb		[i(s)] = [t] byte	101000 sssss ttttt iiiii iiiii iiiiii 符号扩展i，结果零扩展
+
+sh		[i(s)] = [t] byte	101001 sssss ttttt iiiii iiiii iiiiii 符号扩展i
+
+sw		[i(s)] = [t]		101011 sssss ttttt iiiii iiiii iiiiii 符号扩展i
+
+	syscall					000000 code                    001100
+	break					000000 code                    001101
+	mfc0					010000 00000 ttttt ddddd 00000000 sel
+	mtc0					010000 00100 ttttt ddddd 00000000 sel
+	eret					010000 1 0000000000000000000   011000 
