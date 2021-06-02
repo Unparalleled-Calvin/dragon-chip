@@ -2,9 +2,11 @@
 `include "mycpu/mycpu.svh"
 
 module Execute (
+    input common_context_t CommonContext,
+    input memory_context_t memoryContext, 
+    input write_context_t WriteContext,
     input logic clk, resetn,
     input execute_context_t ExecuteContext,
-
     output execute_context_t executeContext
 );
 
@@ -47,6 +49,16 @@ module Execute (
     Execute_DIV Execute_DIV_Inst(.valid(ExecuteContext.stat == SE_DIV), .done(div_done), 
                                  .a(mult_a), .b(mult_b), .c(div_c), .*);
 
+    word_t vhi, vlo;
+    Execute_Forward_HILO Execute_Forward_hilo_Inst(
+        .m(memoryContext.write_hilo),
+        .w(WriteContext.write_hilo),
+        .data_hi(CommonContext.hi), 
+        .data_lo(CommonContext.lo), 
+        .vhi(vhi),
+        .vlo(vlo)
+    );
+    
     Execute_HILO Execute_HILO_Inst(.op(ExecuteContext.op), .a(vs), .b(vt), .*);
 
     always_comb begin
@@ -67,9 +79,13 @@ module Execute (
             else if (ExecuteContext.stat == SE_MULT) begin
                 if (mult_done) begin
                     executeContext.stat = SE_IDLE;
-                    // {hi, lo} = a * b;
-                    executeContext.write_hilo.hi = hi;
-                    executeContext.write_hilo.lo = lo;
+                    if (ExecuteContext.op == MUL)begin
+                        executeContext.write_reg.value = mult_c[31:0];
+                    end else begin
+                        // {hi, lo} = a * b;
+                        executeContext.write_hilo.hi = hi;
+                        executeContext.write_hilo.lo = lo;
+                    end
                 end
             end
             else if (ExecuteContext.stat == SE_DIV) begin

@@ -22,8 +22,13 @@ typedef enum i8 {
     MFLO,
     MTHI,
     MTLO,
+	MUL,
     MULT,
     MULTU,
+	MADD,
+	MADDU,
+	MSUB,
+	MSUBU,
     DIV,
     DIVU,
     ADD,
@@ -65,7 +70,9 @@ typedef enum i8 {
 	SB,
 	SH,
 	SW,
-	DECODE_ERROR
+	DECODE_ERROR,
+	CLO,
+	CLZ
 } op_t;
 
 `endif

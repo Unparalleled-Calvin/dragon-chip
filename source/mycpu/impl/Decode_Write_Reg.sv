@@ -59,7 +59,13 @@ module Decode_Write_Reg (
                 write_reg.value = 32'h0;
                 write_reg.dst = 5'h0; //rd;
             end
-            MULT, MULTU, DIV, DIVU: begin
+            MUL: begin
+                write_reg.valid = 1;
+                write_reg.src = SRC_ALU;
+                write_reg.value = 32'h0;
+                write_reg.dst = rd;
+            end
+            MULT, MULTU, DIV, DIVU, MADD, MADDU, MSUB, MSUBU: begin
                 write_reg.valid = 0; //1;
                 write_reg.src = SRC_ALU;
                 write_reg.value = 32'h0;
@@ -132,6 +138,12 @@ module Decode_Write_Reg (
                 write_reg.src = SRC_NOP;
                 write_reg.value = 32'h0;
                 write_reg.dst = 5'h0;
+            end
+            CLO, CLZ: begin
+                write_reg.valid = 1;
+                write_reg.src = SRC_ALU;
+                write_reg.value = 32'h0;
+                write_reg.dst = rd;
             end
             default: begin
                 write_reg = '0;

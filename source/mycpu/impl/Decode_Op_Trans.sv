@@ -81,6 +81,17 @@ always_comb begin
             else
                 op = DECODE_ERROR;
         end
+        6'b011100: begin
+            unique case (instr[5:0])
+            6'b000000: op = MADD;
+            6'b000001: op = MADDU;
+            6'b000100: op = MSUB;
+            6'b000101: op = MSUBU;
+            6'b100000: op = CLZ;
+            6'b100001: op = CLO;
+            6'b000010: op = MUL;
+            default  : op = DECODE_ERROR;
+        end
         6'b100000: op = LB;
         6'b100001: op = LH;
         6'b100011: op = LW;

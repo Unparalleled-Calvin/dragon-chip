@@ -21,7 +21,7 @@ module Decode_Write_HILO (
                 write_hilo.hi = 32'b0;
                 write_hilo.lo = vs;
             end
-            MULT, MULTU, DIV, DIVU: begin
+            MULT, MULTU, DIV, DIVU, MADD, MADDU, MSUB, MSUBU: begin
                 write_hilo.valid_hi = 1'b1;
                 write_hilo.valid_lo = 1'b1;
                 write_hilo.hi = 32'b0;

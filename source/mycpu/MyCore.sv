@@ -62,7 +62,7 @@ always_comb begin
     decodeContext_NORMAL.exception = fetchContext.exception;
 
     executeContext_NORMAL = EXECUTE_CONTEXT_RESET;
-    if (decodeContext.op == MULT || decodeContext.op == MULTU)
+    if (decodeContext.op == MULT || decodeContext.op == MULTU || decodeContext.op == MUL || decodeContext.op == MADD ||decodeContext.op == MADDU || decodeContext.op == MSUB || decodeContext.op == MSUBU)
         executeContext_NORMAL.stat = SE_MULT;
     else if (decodeContext.op == DIV || decodeContext.op == DIVU)
         executeContext_NORMAL.stat = SE_DIV;

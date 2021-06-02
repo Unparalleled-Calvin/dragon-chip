@@ -4,6 +4,7 @@
 module Execute_HILO (
     input op_t op,
     input word_t a, b,
+    input word_t vhi, vlo,
     input i64 mult_c, div_c,
     output word_t hi, lo
 );
@@ -27,6 +28,29 @@ module Execute_HILO (
                     lo = mult_c_neg[31:0];
                 end
             end
+            MADDU: begin
+                {hi, lo} = {vhi, vlo} + mult_c;
+            end
+            MADD: begin
+                if (a[31] == b[31]) begin
+                    {hi, lo} = {vhi, vlo} + mult_c;
+                end
+                else begin
+                    {hi, lo} = {vhi, vlo} + mult_c_neg;
+                end
+            end
+            MSUBU: begin
+                {hi, lo} = {vhi, vlo} - mult_c;
+            end
+            MSUB: begin
+                if (a[31] == b[31]) begin
+                    {hi, lo} = {vhi, vlo} - mult_c;
+                end
+                else begin
+                    {hi, lo} = {vhi, vlo} - mult_c_neg;
+                end
+            end
+            decodeContext.op == MSUB || decodeContext.op == MSUBU
             DIVU: begin
                 hi = div_c[63:32];
                 lo = div_c[31:0];

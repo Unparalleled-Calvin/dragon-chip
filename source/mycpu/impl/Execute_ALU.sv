@@ -75,6 +75,80 @@ module Execute_ALU (
             SB      : result = vs + vi;
             SH      : result = vs + vi;
             SW      : result = vs + vi;
+            CLO     : begin
+                        priority case(0)
+                        vs[31] : result = 32'd0;
+                        vs[30] : result = 32'd1;
+                        vs[29] : result = 32'd2;
+                        vs[28] : result = 32'd3;
+                        vs[27] : result = 32'd4;
+                        vs[26] : result = 32'd5;
+                        vs[25] : result = 32'd6;
+                        vs[24] : result = 32'd7;
+                        vs[23] : result = 32'd8;
+                        vs[22] : result = 32'd9;
+                        vs[21] : result = 32'd10;
+                        vs[20] : result = 32'd11;
+                        vs[19] : result = 32'd12;
+                        vs[18] : result = 32'd13;
+                        vs[17] : result = 32'd14;
+                        vs[16] : result = 32'd15;
+                        vs[15] : result = 32'd16;
+                        vs[14] : result = 32'd17;
+                        vs[13] : result = 32'd18;
+                        vs[12] : result = 32'd19;
+                        vs[11] : result = 32'd20;
+                        vs[10] : result = 32'd21;
+                        vs[9]  : result = 32'd22;
+                        vs[8]  : result = 32'd23;
+                        vs[7]  : result = 32'd24;
+                        vs[6]  : result = 32'd25;
+                        vs[5]  : result = 32'd26;
+                        vs[4]  : result = 32'd27;
+                        vs[3]  : result = 32'd28;
+                        vs[2]  : result = 32'd29;
+                        vs[1]  : result = 32'd30;
+                        vs[0]  : result = 32'd31;
+                        default: result = 32'd32;
+                        endcase
+                    end
+            CLZ     : begin
+                        priority case(1)
+                        vs[31] : result = 32'd0;
+                        vs[30] : result = 32'd1;
+                        vs[29] : result = 32'd2;
+                        vs[28] : result = 32'd3;
+                        vs[27] : result = 32'd4;
+                        vs[26] : result = 32'd5;
+                        vs[25] : result = 32'd6;
+                        vs[24] : result = 32'd7;
+                        vs[23] : result = 32'd8;
+                        vs[22] : result = 32'd9;
+                        vs[21] : result = 32'd10;
+                        vs[20] : result = 32'd11;
+                        vs[19] : result = 32'd12;
+                        vs[18] : result = 32'd13;
+                        vs[17] : result = 32'd14;
+                        vs[16] : result = 32'd15;
+                        vs[15] : result = 32'd16;
+                        vs[14] : result = 32'd17;
+                        vs[13] : result = 32'd18;
+                        vs[12] : result = 32'd19;
+                        vs[11] : result = 32'd20;
+                        vs[10] : result = 32'd21;
+                        vs[9]  : result = 32'd22;
+                        vs[8]  : result = 32'd23;
+                        vs[7]  : result = 32'd24;
+                        vs[6]  : result = 32'd25;
+                        vs[5]  : result = 32'd26;
+                        vs[4]  : result = 32'd27;
+                        vs[3]  : result = 32'd28;
+                        vs[2]  : result = 32'd29;
+                        vs[1]  : result = 32'd30;
+                        vs[0]  : result = 32'd31;
+                        default: result = 32'd32;
+                        endcase
+                    end
             default : result = 32'h0;
         endcase
     end
