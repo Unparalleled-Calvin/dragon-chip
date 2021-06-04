@@ -24,21 +24,23 @@ assign valid_0 = MemoryContext.memory_args.valid &&
 assign msize2_addr_error = valid_0 &&
                            MemoryContext.memory_args.msize == MSIZE2 && 
                            MemoryContext.memory_args.addr[0] == 1'b1;
-assign msize4_addr_error = valid_0 &&
+assign msize4_addr_error = valid_0 && (MemoryContext.op == LW || MemoryContext == SW) &&
                            MemoryContext.memory_args.msize == MSIZE4 && 
                            MemoryContext.memory_args.addr[1:0] != 2'b0;
 
 assign dreq.valid = valid_0 && (!msize2_addr_error) && (!msize4_addr_error);
 assign dreq.addr = MemoryContext.memory_args.addr;
 assign dreq.size = MemoryContext.memory_args.msize;
-Memory_Select_Dreq_Strobe Memory_Select_Dreq_Strobe_Inst(.MemoryArgs(MemoryContext.memory_args), .strobe(dreq.strobe));
-Memory_Select_Dreq_Data Memory_Select_Dreq_Data_Inst(.MemoryArgs(MemoryContext.memory_args), .data(dreq.data));
+Memory_Select_Dreq_Strobe Memory_Select_Dreq_Strobe_Inst(.MemoryArgs(MemoryContext.memory_args), .op(MemoryContext.op), .strobe(dreq.strobe));
+Memory_Select_Dreq_Data Memory_Select_Dreq_Data_Inst(.MemoryArgs(MemoryContext.memory_args), .op(MemoryContext.op), .data(dreq.data));
 
 word_t m_data;
 
 Memory_Select_Dresp_Data Memory_Select_Dresp_Data_Inst(
     .MemoryArgs(MemoryContext.memory_args), 
+    .op(MemoryContext.op),
     .raw_data(dresp.data),
+    .ref_data(CommonContext.r[MemoryContext.write_reg.dst])
     .data(m_data)
 );
 

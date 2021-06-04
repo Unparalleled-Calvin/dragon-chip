@@ -3,7 +3,7 @@
 
 module Memory_Select_Dreq_Strobe (
     input memory_args_t MemoryArgs,
-
+    input op_t op,
     output i4 strobe
 );
 
@@ -29,10 +29,25 @@ always_comb begin
                 endcase
             end
             MSIZE4: begin
-                unique case (offset)
-                    2'b00: strobe = 4'b1111;
-                    default: strobe = 4'b0000;
-                endcase
+                if (op == SWL) begin
+                    unique case (offset)
+                        2'b00: strobe = 4'b0001;
+                        2'b01: strobe = 4'b0011;
+                        2'b10: strobe = 4'b0111;
+                        2'b11: strobe = 4'b1111;
+                    endcase
+                end else if (op == SWR) begin
+                    unique case (offset)
+                        2'b00: strobe = 4'b1111;
+                        2'b01: strobe = 4'b1110;
+                        2'b10: strobe = 4'b1100;
+                        2'b11: strobe = 4'b1000;
+                    endcase
+                end else
+                    unique case (offset)
+                        2'b00: strobe = 4'b1111;
+                        default: strobe = 4'b0000;
+                    endcase
             end
             default: strobe = 4'b0000;
         endcase

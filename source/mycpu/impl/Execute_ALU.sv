@@ -70,11 +70,15 @@ module Execute_ALU (
             LB      : result = vs + vi;
             LH      : result = vs + vi;
             LW      : result = vs + vi;
+            LWL     : result = vs + vi;
+            LWR     : result = vs + vi;
             LBU     : result = vs + vi;
             LHU     : result = vs + vi;
             SB      : result = vs + vi;
             SH      : result = vs + vi;
             SW      : result = vs + vi;
+            SWL     : result = vs + vi;
+            SWR     : result = vs + vi;
             CLO     : begin
                         priority case(0)
                         vs[31] : result = 32'd0;

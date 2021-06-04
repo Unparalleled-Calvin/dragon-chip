@@ -31,6 +31,20 @@ module Decode_Memory (
                 memory_args.msize = MSIZE4;
                 memory_args.data = vt;
             end
+            SWL: begin
+                memory_args.valid = 1;
+                memory_args.write = 1;
+                memory_args.sig = SIGNED;
+                memory_args.msize = MSIZE4;
+                memory_args.data = vt;
+            end
+            SWR: begin
+                memory_args.valid = 1;
+                memory_args.write = 1;
+                memory_args.sig = SIGNED;
+                memory_args.msize = MSIZE4;
+                memory_args.data = vt;
+            end
             LB: begin
                 memory_args.valid = 1;
                 memory_args.write = 0;
@@ -60,6 +74,20 @@ module Decode_Memory (
                 memory_args.data = 32'b0;
             end
             LW: begin
+                memory_args.valid = 1;
+                memory_args.write = 0;
+                memory_args.sig = SIGNED;
+                memory_args.msize = MSIZE4;
+                memory_args.data = 32'b0;
+            end
+            LWL: begin
+                memory_args.valid = 1;
+                memory_args.write = 0;
+                memory_args.sig = SIGNED;
+                memory_args.msize = MSIZE4;
+                memory_args.data = 32'b0;
+            end
+            LWR: begin
                 memory_args.valid = 1;
                 memory_args.write = 0;
                 memory_args.sig = SIGNED;

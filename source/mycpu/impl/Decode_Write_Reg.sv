@@ -127,13 +127,13 @@ module Decode_Write_Reg (
                 write_reg.value = cp0_v_updated;
                 write_reg.dst = rd;
             end
-            LB, LH, LW, LBU, LHU: begin
+            LB, LH, LW, LBU, LHU, LWL, LWR: begin
                 write_reg.valid = 1;
                 write_reg.src = SRC_MEM;
                 write_reg.value = 32'h0;
                 write_reg.dst = rt;
             end
-            SB, SH, SW: begin
+            SB, SH, SW, SWL, SWR: begin
                 write_reg.valid = 0;
                 write_reg.src = SRC_NOP;
                 write_reg.value = 32'h0;

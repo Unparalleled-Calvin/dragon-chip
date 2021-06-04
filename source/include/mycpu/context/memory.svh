@@ -19,7 +19,7 @@ typedef struct packed {
     memory_args_t memory_args;
     write_reg_t write_reg;
     write_hilo_t write_hilo;
-
+    
     exception_args_t exception;
 } memory_context_t;
 

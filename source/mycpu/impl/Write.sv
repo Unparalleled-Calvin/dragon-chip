@@ -108,7 +108,7 @@ module Write (
                     endcase
                 end
                 else if (WriteContext.write_reg.dst != 0)
-                        commonContext.r[WriteContext.write_reg.dst] = WriteContext.write_reg.value;
+                    commonContext.r[WriteContext.write_reg.dst] = WriteContext.write_reg.value;
             end
             
             if (WriteContext.write_hilo.valid_hi)
