@@ -23,6 +23,8 @@ always_comb begin
                 6'b000111: op = SRAV;
                 6'b001000: op = JR;
                 6'b001001: op = JALR;
+                6'b001010: op = MOVZ;
+                6'b001011: op = MOVN;
                 6'b001100: op = SYSCALL;
                 6'b001101: op = BREAK;
                 6'b010000: op = MFHI;

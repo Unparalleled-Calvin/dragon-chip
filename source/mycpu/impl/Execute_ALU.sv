@@ -153,6 +153,8 @@ module Execute_ALU (
                         default: result = 32'd32;
                         endcase
                     end
+            MOVN    : result = vs;
+            MOVZ    : result = vs;
             default : result = 32'h0;
         endcase
     end

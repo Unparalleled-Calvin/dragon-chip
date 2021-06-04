@@ -71,8 +71,14 @@ module Execute (
                 executeContext.stat = SE_IDLE;
                 if (exception_ov)
                     `THROW(executeContext.exception, EX_OV, ExecuteContext.pc);
-                if (ExecuteContext.write_reg.src == SRC_ALU)
+                if (ExecuteContext.write_reg.src == SRC_ALU) begin
                     executeContext.write_reg.value = result;
+                    if (ExecuteContext.op == MOVN) begin
+                        executeContext.write_reg.valid = |{ExecuteContext.vars.vt};
+                    end else if (ExecuteContext.op == MOVZ) begin
+                        executeContext.write_reg.valid = ~(|{ExecuteContext.vars.vt});
+                    end
+                end
                 if (ExecuteContext.memory_args.valid)
                     executeContext.memory_args.addr = result;
             end

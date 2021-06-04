@@ -145,6 +145,12 @@ module Decode_Write_Reg (
                 write_reg.value = 32'h0;
                 write_reg.dst = rd;
             end
+            MOVN, MOVZ: begin
+                write_reg.valid = 1;
+                write_reg.src = SRC_ALU;
+                write_reg.value = 32'h0;
+                write_reg.dst = rd;
+            end
             default: begin
                 write_reg = '0;
             end

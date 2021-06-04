@@ -76,7 +76,9 @@ typedef enum i8 {
 	SWR,
 	DECODE_ERROR,
 	CLO,
-	CLZ
+	CLZ,
+	MOVN,
+	MOVZ,
 } op_t;
 
 `endif
