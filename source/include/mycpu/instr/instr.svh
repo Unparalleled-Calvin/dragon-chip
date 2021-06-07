@@ -78,7 +78,7 @@ typedef enum i8 {
 	CLO,
 	CLZ,
 	MOVN,
-	MOVZ,
+	MOVZ
 } op_t;
 
 `endif

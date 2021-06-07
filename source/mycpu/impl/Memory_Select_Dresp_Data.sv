@@ -52,7 +52,7 @@ always_comb begin
                 unique case (offset)
                     2'b00: data = {raw_data[7:0], ref_data[23:0]};
                     2'b01: data = {raw_data[15:0], ref_data[15:0]};
-                    2'b10: data = {raw_data[23:0], ref_data[7:0]}
+                    2'b10: data = {raw_data[23:0], ref_data[7:0]};
                     2'b11: data = raw_data;
                     default: data = 32'h0;
                 endcase

@@ -50,7 +50,6 @@ module Execute_HILO (
                     {hi, lo} = {vhi, vlo} - mult_c_neg;
                 end
             end
-            decodeContext.op == MSUB || decodeContext.op == MSUBU
             DIVU: begin
                 hi = div_c[63:32];
                 lo = div_c[31:0];

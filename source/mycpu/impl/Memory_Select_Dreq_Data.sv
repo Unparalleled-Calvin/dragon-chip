@@ -39,9 +39,9 @@ always_comb begin
                 end else if (op == SWR) begin
                     unique case(offset)
                         2'b00: data = MemoryArgs.data;
-                        2'b01: data = {MemoryArgs.data[23:0], 8'b0}
+                        2'b01: data = {MemoryArgs.data[23:0], 8'b0};
                         2'b10: data = {MemoryArgs.data[15:0], 16'b0};
-                        2'b11: data = {MemoryArgs.data[7:0], 24'b0}
+                        2'b11: data = {MemoryArgs.data[7:0], 24'b0};
                     endcase
                 end else
                     unique case (offset)

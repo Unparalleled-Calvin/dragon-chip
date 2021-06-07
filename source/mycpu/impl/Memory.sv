@@ -4,6 +4,7 @@
 module Memory (
     input common_context_t CommonContext,
     input memory_context_t MemoryContext,
+    input write_context_t WriteContext,
     input logic WriteContextExceptionValid, 
     input op_t Write_op,
     output memory_context_t memoryContext,
@@ -40,7 +41,7 @@ Memory_Select_Dresp_Data Memory_Select_Dresp_Data_Inst(
     .MemoryArgs(MemoryContext.memory_args), 
     .op(MemoryContext.op),
     .raw_data(dresp.data),
-    .ref_data(CommonContext.r[MemoryContext.write_reg.dst])
+    .ref_data(MemoryContext.write_reg.dst != 5'b0 && WriteContext.write_reg.valid && WriteContext.write_reg.dst == MemoryContext.write_reg.dst ? WriteContext.write_reg.value : CommonContext.r[MemoryContext.write_reg.dst]),
     .data(m_data)
 );
 
