@@ -5,3 +5,4 @@ vivado/
 LICENSE
 Makefile
 compile_flags.txt
+.idea/

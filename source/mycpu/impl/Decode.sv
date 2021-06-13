@@ -5,14 +5,13 @@ module Decode (
     input common_context_t CommonContext,
 
     input decode_context_t DecodeContext,
+
+    input write_reg_t executeContext_write_reg, memoryContext_write_reg, WriteContext_write_reg,
+    input write_hilo_t executeContext_write_hilo, memoryContext_write_hilo, WriteContext_write_hilo,
     
     output decode_context_t decodeContext,
     output jmp_pack_t decodeJmp,
-    output logic jmp_delayed,
-
-    input execute_context_t executeContext, 
-    input memory_context_t memoryContext, 
-    input write_context_t WriteContext
+    output logic jmp_delayed
 );
 
 op_t op;
@@ -20,9 +19,9 @@ Decode_Op_Trans Decode_Op_Trans_Inst(.instr(DecodeContext.instr), .op(op));
 
 word_t vs;
 Decode_Forward_Reg Decode_Forward_Reg_Inst_s(
-    .e(executeContext.write_reg),
-    .m(memoryContext.write_reg),
-    .w(WriteContext.write_reg),
+    .e(executeContext_write_reg),
+    .m(memoryContext_write_reg),
+    .w(WriteContext_write_reg),
     .src(DecodeContext.instr[25:21]), 
     .data_src(CommonContext.r[DecodeContext.instr[25:21]]), 
     .vr(vs)
@@ -30,9 +29,9 @@ Decode_Forward_Reg Decode_Forward_Reg_Inst_s(
 
 word_t vt;
 Decode_Forward_Reg Decode_Forward_Reg_Inst_t(
-    .e(executeContext.write_reg),
-    .m(memoryContext.write_reg),
-    .w(WriteContext.write_reg),
+    .e(executeContext_write_reg),
+    .m(memoryContext_write_reg),
+    .w(WriteContext_write_reg),
     .src(DecodeContext.instr[20:16]), 
     .data_src(CommonContext.r[DecodeContext.instr[20:16]]), 
     .vr(vt)
@@ -40,9 +39,9 @@ Decode_Forward_Reg Decode_Forward_Reg_Inst_t(
 
 word_t vhi, vlo;
 Decode_Forward_HILO Decode_Forward_hilo_Inst(
-    .e(executeContext.write_hilo),
-    .m(memoryContext.write_hilo),
-    .w(WriteContext.write_hilo),
+    .e(executeContext_write_hilo),
+    .m(memoryContext_write_hilo),
+    .w(WriteContext_write_hilo),
     .data_hi(CommonContext.hi), 
     .data_lo(CommonContext.lo), 
     .vhi(vhi),

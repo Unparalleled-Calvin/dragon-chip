@@ -11,11 +11,8 @@
 `include "memory.svh"
 `include "write.svh"
 
-typedef enum i2 {
-    NORMAL   = 2'b00,
-    STALL    = 2'b01, // STALL 同时用来处理busy
-    BUBBLE   = 2'b10,
-    ERROR    = 2'b11
+typedef struct packed {
+    logic resetn, valid, ready;
 } pipeline_stat_t;
 
 typedef struct packed {
