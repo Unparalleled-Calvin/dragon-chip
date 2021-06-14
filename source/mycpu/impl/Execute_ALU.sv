@@ -20,6 +20,8 @@ module Execute_ALU (
     
     always_comb begin
         exception_ov = '0;
+        result = '0;
+        result33 = '0;
         unique case (ExecuteContext.op)
             SLL     : result = vt << va;
             SRL     : result = vt >> va;

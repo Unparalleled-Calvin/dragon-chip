@@ -19,7 +19,7 @@ module Decode_Write_Reg (
             5'd13: begin cp0_v_old = cp0.Cause; cp0_mask = CP0_MASK.Cause; end
             5'd14: begin cp0_v_old = cp0.EPC; cp0_mask = CP0_MASK.EPC; end
             5'd30: begin cp0_v_old = cp0.ErrorEPC; cp0_mask = CP0_MASK.ErrorEPC; end
-            default: begin cp0_v_old = 32'h0; end // TODO ERROR
+            default: begin cp0_v_old = 32'h0; cp0_mask = '0; end // TODO ERROR
         endcase
         cp0_v_new = vt;
         cp0_v_updated = (cp0_v_old & ~cp0_mask) | (cp0_v_new & cp0_mask);

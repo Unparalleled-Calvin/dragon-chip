@@ -28,7 +28,14 @@ logic jmp_delayed;
 
 Fetch Fetch_inst(.DecodeContextStat(DecodeContext.stat), .*);
 
-Decode Decode_inst(.*);
+Decode Decode_inst(
+    .executeContext_write_reg(executeContext.write_reg),
+    .memoryContext_write_reg(memoryContext.write_reg),
+    .WriteContext_write_reg(WriteContext.write_reg),
+    .executeContext_write_hilo(executeContext.write_hilo),
+    .memoryContext_write_hilo(memoryContext.write_hilo),
+    .WriteContext_write_hilo(WriteContext.write_hilo),
+    .*);
 
 Execute Execute_inst(.*);
 
@@ -53,7 +60,7 @@ always_comb begin
         fetchContext_NORMAL.pc = fetchContext.decodeJmp.pc_dst;
     else
         fetchContext_NORMAL.pc = fetchContext.next_pc;
-    fetchContext_NORMAL.next_pc = fetchContext.next_pc + 4;
+    fetchContext_NORMAL.next_pc = fetchContext_NORMAL.pc + 4;
 
     decodeContext_NORMAL = DECODE_CONTEXT_RESET;
     decodeContext_NORMAL.stat = SD_DECODE;
@@ -107,41 +114,41 @@ always_ff @(posedge clk) begin
         CommonContext <= commonContext;
     
     // Fetch
-    if(~resetn || FetchStat == BUBBLE)
+    if(~resetn || ~FetchStat.resetn)
         FetchContext <= FETCH_CONTEXT_RESET;
-    else if (FetchStat == STALL)
+    else if (FetchStat.ready == 0)
         FetchContext <= fetchContext;
     else
         FetchContext <= fetchContext_NORMAL;
 
     // Decode
-    if(~resetn || DecodeStat == BUBBLE)
+    if(~resetn || ~DecodeStat.resetn || (DecodeStat.ready == 1 && FetchStat.valid == 0))
         DecodeContext <= DECODE_CONTEXT_RESET;
-    else if (DecodeStat == STALL)
+    else if (DecodeStat.ready == 0)
         DecodeContext <= decodeContext;
     else
         DecodeContext <= decodeContext_NORMAL;
     
     // Execute
-    if(~resetn || ExecuteStat == BUBBLE)
+    if(~resetn || ~ExecuteStat.resetn || (ExecuteStat.ready == 1 && DecodeStat.valid == 0))
         ExecuteContext <= EXECUTE_CONTEXT_RESET;
-    else if (ExecuteStat == STALL)
+    else if (ExecuteStat.ready == 0)
         ExecuteContext <= executeContext;
     else
         ExecuteContext <= executeContext_NORMAL;
 
     // Memory
-    if(~resetn || MemoryStat == BUBBLE)
+    if(~resetn || ~MemoryStat.resetn || (MemoryStat.ready == 1 && ExecuteStat.valid == 0))
         MemoryContext <= MEMORY_CONTEXT_RESET;
-    else if (MemoryStat == STALL)
+    else if (MemoryStat.ready == 0)
         MemoryContext <= memoryContext;
     else
         MemoryContext <= memoryContext_NORMAL;
 
     // Write
-    if(~resetn || WriteStat == BUBBLE)
+    if(~resetn || ~WriteStat.resetn || (WriteStat.ready == 1 && MemoryStat.valid == 0))
         WriteContext <= WRITE_CONTEXT_RESET;
-    else if (WriteStat == STALL) begin
+    else if (WriteStat.ready == 0) begin
         //pass
     end
     else

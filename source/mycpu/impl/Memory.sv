@@ -2,7 +2,6 @@
 `include "mycpu/mycpu.svh"
 
 module Memory (
-    input common_context_t CommonContext,
     input memory_context_t MemoryContext,
     input write_context_t WriteContext,
     input logic WriteContextExceptionValid, 
