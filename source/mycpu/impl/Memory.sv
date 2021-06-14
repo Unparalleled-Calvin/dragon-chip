@@ -6,6 +6,7 @@ module Memory (
     input write_context_t WriteContext,
     input logic WriteContextExceptionValid, 
     input op_t Write_op,
+    input word_t[31:0] CommonContext_r,
     output memory_context_t memoryContext,
 
     output dbus_req_t  dreq,
@@ -24,7 +25,7 @@ assign valid_0 = MemoryContext.memory_args.valid &&
 assign msize2_addr_error = valid_0 &&
                            MemoryContext.memory_args.msize == MSIZE2 && 
                            MemoryContext.memory_args.addr[0] == 1'b1;
-assign msize4_addr_error = valid_0 && (MemoryContext.op == LW || MemoryContext == SW) &&
+assign msize4_addr_error = valid_0 && (MemoryContext.op == LW || MemoryContext.op == SW) &&
                            MemoryContext.memory_args.msize == MSIZE4 && 
                            MemoryContext.memory_args.addr[1:0] != 2'b0;
 
@@ -40,7 +41,7 @@ Memory_Select_Dresp_Data Memory_Select_Dresp_Data_Inst(
     .MemoryArgs(MemoryContext.memory_args), 
     .op(MemoryContext.op),
     .raw_data(dresp.data),
-    .ref_data(MemoryContext.write_reg.dst != 5'b0 && WriteContext.write_reg.valid && WriteContext.write_reg.dst == MemoryContext.write_reg.dst ? WriteContext.write_reg.value : CommonContext.r[MemoryContext.write_reg.dst]),
+    .ref_data(MemoryContext.write_reg.dst != 5'b0 && WriteContext.write_reg.valid && WriteContext.write_reg.dst == MemoryContext.write_reg.dst ? WriteContext.write_reg.value : CommonContext_r[MemoryContext.write_reg.dst]),
     .data(m_data)
 );
 

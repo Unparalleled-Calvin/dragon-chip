@@ -39,7 +39,7 @@ Decode Decode_inst(
 
 Execute Execute_inst(.*);
 
-Memory Memory_inst(.WriteContextExceptionValid(WriteContext.exception.valid), .Write_op(WriteContext.op), .*);
+Memory Memory_inst(.WriteContextExceptionValid(WriteContext.exception.valid), .Write_op(WriteContext.op), .CommonContext_r(CommonContext.r), .*);
 
 Write Write_inst(.*);
 
