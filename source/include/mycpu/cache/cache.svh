@@ -27,16 +27,25 @@ typedef enum i2 {
                         // 目标值如果已经在缓存中则返回缓存中的值，否则返回最后一次读取的值
     SC_FLUSH = 2'h2,    // 将一条cacheline中的写回内存
                         // 写回结束判断是否正等待读取，如果是则读取内存。
-    SC_READY = 2'h3     // 执行存储的req请求，并返回值
+    SC_FETCH_IDLE = 2'h3
 } cache_state_t /* verilator public */;
 
-// the RAM
+// the DCache
 typedef struct packed {
     logic    en;
     offset_t offset;
     strobe_t strobe;
     word_t   wdata;
 } ram_switch_t;
+
+// the ICache
+typedef struct packed {
+    logic    en;
+    offset_t offset_1;
+    strobe_t strobe;
+    word_t   wdata;
+    offset_t offset_2;
+} icache_ram_switch_t;
 
 typedef struct packed {
     tag_t tag;
@@ -59,6 +68,16 @@ typedef struct packed {
     cache_set_meta_t [cache_set_size - 1:0] cache_set_meta;
 } cache_context_t /* verilator public */;
 
+typedef struct packed {
+    cache_state_t stat;
+    offset_t offset;
+    flex_bus_req_t req;
+    // dreq 必须存储，否则 addr_ok 会失去意义，导致后续无法进行优化。
+    // 那么在 IDLE 阶段，使用 dreq 进行解码。
+    // 在其他阶段，因为已经在 context 中存储了 dreq，则用存储的 dreq 进行解码。
+    cache_set_meta_t [cache_set_size - 1:0] cache_set_meta;
+} Icache_context_t /* verilator public */;
+
 parameter cache_line_meta_t CACHE_LINE_META_RESET = '{
     tag : '0,
     valid : '0,
@@ -74,7 +93,14 @@ parameter cache_context_t CACHE_CONTEXT_RESET = '{
     stat : SC_IDLE,
     offset : '0,
     req : '0,
-    cache_set_meta : {cache_set_size{CACHE_SET_META_RESET}}//,
+    cache_set_meta : {cache_set_size{CACHE_SET_META_RESET}}
+};
+
+parameter Icache_context_t ICACHE_CONTEXT_RESET = '{
+    stat : SC_IDLE,
+    offset : '0,
+    req : '0,
+    cache_set_meta : {cache_set_size{CACHE_SET_META_RESET}}
 };
 
 `endif

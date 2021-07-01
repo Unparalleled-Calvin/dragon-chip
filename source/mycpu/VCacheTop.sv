@@ -17,6 +17,7 @@ module VCacheTop (
 
     assign creq = dcreq;
     assign dcresp = cresp;
+    logic block;
     DCache top(.*);
 
     /**

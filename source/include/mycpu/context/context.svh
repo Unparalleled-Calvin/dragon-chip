@@ -12,7 +12,7 @@
 `include "write.svh"
 
 typedef struct packed {
-    logic resetn, valid, ready;
+    logic valid, ready;
 } pipeline_stat_t;
 
 typedef struct packed {

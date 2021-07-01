@@ -2,99 +2,96 @@
 `include "mycpu/mycpu.svh"
 
 module Memory (
-    input memory_context_t MemoryContext,
-    input logic WriteContextExceptionValid, 
-    input op_t Write_op,
-    output memory_context_t memoryContext,
+    input logic clk, resetn,
+    input memory_context_t execute2memory_1, execute2memory_2,
 
     output dbus_req_t  dreq,
-    input dbus_resp_t  dresp
-);
-
-logic valid_0;
-logic msize2_addr_error, msize4_addr_error;
-
-assign valid_0 = MemoryContext.memory_args.valid && 
-                 MemoryContext.stat != SM_IDLE &&
-                 !MemoryContext.exception.valid && 
-                 !WriteContextExceptionValid && 
-                 Write_op != ERET;
-
-assign msize2_addr_error = valid_0 &&
-                           MemoryContext.memory_args.msize == MSIZE2 && 
-                           MemoryContext.memory_args.addr[0] == 1'b1;
-assign msize4_addr_error = valid_0 &&
-                           MemoryContext.memory_args.msize == MSIZE4 && 
-                           MemoryContext.memory_args.addr[1:0] != 2'b0;
-
-assign dreq.valid = valid_0 && (!msize2_addr_error) && (!msize4_addr_error);
-assign dreq.addr = MemoryContext.memory_args.addr;
-assign dreq.size = MemoryContext.memory_args.msize;
-Memory_Select_Dreq_Strobe Memory_Select_Dreq_Strobe_Inst(.MemoryArgs(MemoryContext.memory_args), .strobe(dreq.strobe));
-Memory_Select_Dreq_Data Memory_Select_Dreq_Data_Inst(.MemoryArgs(MemoryContext.memory_args), .data(dreq.data));
-
-word_t m_data;
-
-Memory_Select_Dresp_Data Memory_Select_Dresp_Data_Inst(
-    .MemoryArgs(MemoryContext.memory_args), 
-    .raw_data(dresp.data),
-    .data(m_data)
-);
-
-always_comb begin
-    memoryContext = MemoryContext;
+    input dbus_resp_t  dresp,
+    output write_single_context_t memory2write_1, memory2write_2,
     
-    if (valid_0) begin
-        if (msize2_addr_error || msize4_addr_error) begin
-            if (MemoryContext.memory_args.write)
-                `ADDR_ERROR(memoryContext.exception, EX_ADES, MemoryContext.memory_args.addr, MemoryContext.pc)
-            else
-                `ADDR_ERROR(memoryContext.exception, EX_ADEL, MemoryContext.memory_args.addr, MemoryContext.pc)
-            memoryContext.stat = SM_IDLE;
+    output write_reg_t write_reg_1, write_reg_2, 
+    output write_hilo_t write_hilo_1, write_hilo_2, 
+    input pipeline_stat_t WriteStat,
+    output pipeline_stat_t MemoryStat_1, MemoryStat_2, 
+    input logic succeed_exception_valid,
+    output logic exception_valid, ERET_exist, MTC0_exist
+);
+    
+    dbus_req_t  dreq_1, dreq_2;
+    dbus_resp_t  dresp_1, dresp_2;
+    
+    logic exception_valid_1, exception_valid_2;
+    logic ERET_exist_1, ERET_exist_2;
+    logic MTC0_exist_1, MTC0_exist_2;
+    logic done_1, done_2, done_doned_1, done_doned_2, error_1, error_2;
+    
+    assign exception_valid = exception_valid_1 || exception_valid_2;
+    assign ERET_exist = ERET_exist_1 || ERET_exist_2;
+    assign MTC0_exist = MTC0_exist_1 || MTC0_exist_2; 
+
+    Memory_single Memory_single_inst_1(
+        .execute2memory(execute2memory_1),
+        .dreq(dreq_1),
+        .dresp(dresp_1),
+        .memory2write(memory2write_1),
+        .write_reg(write_reg_1),
+        .write_hilo(write_hilo_1),
+        .MemoryStat(MemoryStat_1),
+        .succeed_exception_valid(succeed_exception_valid),
+        .exception_valid(exception_valid_1), 
+        .ERET_exist(ERET_exist_1), 
+        .MTC0_exist(MTC0_exist_1),
+        .done(done_1),
+        .done_doned(done_doned_1),
+        .error(error_1),
+        .*
+    );
+    
+    Memory_single Memory_single_inst_2(
+        .execute2memory(execute2memory_2),
+        .dreq(dreq_2),
+        .dresp(dresp_2),
+        .memory2write(memory2write_2),
+        .write_reg(write_reg_2),
+        .write_hilo(write_hilo_2),
+        .MemoryStat(MemoryStat_2),
+        .succeed_exception_valid(succeed_exception_valid || error_1),
+        .exception_valid(exception_valid_2), 
+        .ERET_exist(ERET_exist_2), 
+        .MTC0_exist(MTC0_exist_2),
+        .done(done_2),
+        .done_doned(done_doned_2),
+        .error(error_2),
+        .*
+    );
+    
+    always_comb begin
+        dresp_1 = '0;
+        dresp_2 = '0;
+        if (!done_doned_1) begin
+            dreq = dreq_1;
+            dresp_1 = dresp;
         end
         else begin
-            unique case (MemoryContext.stat)
-                SM_STORE: begin
-                    if (dresp.addr_ok && dresp.data_ok) begin
-                        memoryContext.stat = SM_IDLE;
-                        memoryContext.memory_args.valid = 0;
-                    end
-                    else if (dresp.addr_ok)
-                        memoryContext.stat = SM_STOREWAIT;
-                end
-                SM_STOREWAIT: begin
-                    if (dresp.data_ok) begin
-                        memoryContext.stat = SM_IDLE;
-                        memoryContext.memory_args.valid = 0;
-                    end
-                end
-                SM_LOAD: begin
-                    if (dresp.addr_ok && dresp.data_ok) begin
-                        memoryContext.stat = SM_IDLE;
-                        memoryContext.memory_args.valid = 0;
-                        if (MemoryContext.write_reg.src == SRC_MEM)
-                            memoryContext.write_reg.value = m_data;
-                    end
-                    else if (dresp.addr_ok)
-                        memoryContext.stat = SM_LOADWAIT;
-                end
-                SM_LOADWAIT: begin
-                    if (dresp.data_ok) begin
-                        memoryContext.stat = SM_IDLE;
-                        memoryContext.memory_args.valid = 0;
-                        if (MemoryContext.write_reg.src == SRC_MEM)
-                            memoryContext.write_reg.value = m_data;
-                    end
-                end
-                default: begin
-                end
-            endcase
+            dreq = dreq_2;
+            dresp_2 = dresp;
         end
     end
-    else begin
-        memoryContext.stat = SM_IDLE;
-        memoryContext.memory_args.valid = 0;
+    
+    always_comb begin
+        MemoryStat_1 = 2'b11;
+        MemoryStat_2 = 2'b11;
+        if (!done_1 || !done_2) begin
+            MemoryStat_1.valid = 0;
+            MemoryStat_1.ready = 0;
+            MemoryStat_2.valid = 0;
+            MemoryStat_2.ready = 0;
+        end
+        
+        if (WriteStat.ready == 0) begin
+            MemoryStat_1.ready = 0;
+            MemoryStat_2.ready = 0;
+        end
     end
-end
-
+    
 endmodule

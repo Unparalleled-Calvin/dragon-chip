@@ -22,98 +22,15 @@ extern CacheRefModel *ref;
  * basic tests
  */
 
-WITH {
-    dbus->async_load(0xc, MSIZE4);
-    top->tick();
-    // ASSERT(top->dresp == 0);
-} AS("void");
-
-WITH {
-    // NOTE: it depends on your design.
-    //       maybe your cache likes to set addr_ok to false.
-    //       in that case, change following lines to match your design.
-    ASSERT(dbus->addr_ok() == true);
-    ASSERT(dbus->data_ok() == false);
-    ASSERT(dbus->rdata() == 0);
-} AS("reset");
-
-WITH /*TRACE*/ /*DEBUG*/ {
-    auto p = DBusPipeline(top, dbus);
-    
-    p.store(0x0, MSIZE4, 0b1111, 0x12345678);
-    p.store(0x4, MSIZE4, 0b1111, 0xabcddcba);
-    
-    p.tick_skid_buffer();
-    
-} AS("skidbuffer");
-
-WITH STAT {
-    constexpr int n = 400;
-
-    auto p = DBusPipeline(top, dbus);
-    auto factory = MemoryCellFactory(&p);
-
-    auto a = factory.take<uint32_t, n>(0);
-    uint32_t b[n];
-
-    for (int i = 0; i < n; i++) {
-        a[i] = b[i] = randi();
-    }
-    
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < n - i - 1; j++)
-            if (a[j] > a[j + 1])
-                std::swap(a[j], a[j + 1]);
-    
-    std::sort(b, b + n);
-
-    for (int i = 0; i < n; i++) {
-        ASSERT(a[i] == b[i]);
-    }
-} AS("std::bubble_sort");
-
-WITH {
-    for (int i = 0; i < 4096; i++) {
-        dbus->async_loadw(4 * i);
-        dbus->clear();
-        top->eval();
-
-        for (int j = 0; j < 256; j++) {
-            ASSERT(!dbus->valid());
-            top->tick();
-        }
-    }
-} AS("fake load");
-
-WITH {
-    for (int i = 0; i < 4096; i++) {
-        dbus->async_storew(4 * i, 0xdeadbeef);
-        dbus->clear();
-        top->eval();
-
-        for (int j = 0; j < 256; j++) {
-            ASSERT(!dbus->valid());
-            top->tick();
-        }
-    }
-} AS("fake store");
-
 // both dbus->store and dbus->load wait for your model to complete
-WITH {
+WITH TRACE {
     dbus->store(0, MSIZE4, 0b1111, 0x2048ffff);
     ASSERT(dbus->load(0, MSIZE4) == 0x2048ffff);
 } AS("naive");
 
-// this test is explicitly marked with "SKIP".
-WITH SKIP {
-    bool one = 1, three = 3;
-    ASSERT(one + one == three);  // trust me, it must fail
-    // but you should not fail here since it's skipped.
-} AS("akarin~");
-
 // if your cache does not support partial writes, you can simply skip
 // this test by marking it with SKIP.
-WITH /*TRACE*/ {
+WITH TRACE {
     // S iterates over 0b0000 to 0b1111.
     std::vector<word_t> a;  // to store the correct value
     a.resize(16);

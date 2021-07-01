@@ -2,37 +2,40 @@
 `include "mycpu/mycpu.svh"
 
 module Execute_ALU (
-    input execute_context_t ExecuteContext,
+    input word_t Pc, 
+    input op_t Op, 
+    input vars_t Vars,
+    input exception_args_t Exception, 
     output word_t result,
     output logic exception_ov
 );
 
     i32 vs, vt, vi, viu, va;
     i33 result33, vs33, vt33, vi33;
-    assign vs = ExecuteContext.vars.vs;
-    assign vt = ExecuteContext.vars.vt;
-    assign vi = ExecuteContext.vars.vi;
-    assign viu = ExecuteContext.vars.viu;
-    assign va = ExecuteContext.vars.va;
-    assign vs33 = {ExecuteContext.vars.vs[31], ExecuteContext.vars.vs};
-    assign vt33 = {ExecuteContext.vars.vt[31], ExecuteContext.vars.vt};
-    assign vi33 = {ExecuteContext.vars.vi[31], ExecuteContext.vars.vi};
+    assign vs = Vars.vs;
+    assign vt = Vars.vt;
+    assign vi = Vars.vi;
+    assign viu = Vars.viu;
+    assign va = Vars.va;
+    assign vs33 = {Vars.vs[31], Vars.vs};
+    assign vt33 = {Vars.vt[31], Vars.vt};
+    assign vi33 = {Vars.vi[31], Vars.vi};
     
     always_comb begin
         exception_ov = '0;
         result = '0;
         result33 = '0;
-        unique case (ExecuteContext.op)
+        unique case (Op)
             SLL     : result = vt << va;
             SRL     : result = vt >> va;
             SRA     : result = $signed(vt) >>> $signed(va);
             SLLV    : result = vt << (vs[4:0]);
             SRLV    : result = vt >> (vs[4:0]);
             SRAV    : result = $signed(vt) >>> $signed(vs[4:0]);
-            JALR    : result = ExecuteContext.pc + 32'h8;
+            JALR    : result = Pc + 32'h8;
             ADD     : begin
                         result33 = $signed(vs33) + $signed(vt33);
-                        if (result33[32] != result33[31] && !ExecuteContext.exception.valid)
+                        if (result33[32] != result33[31] && !Exception.valid)
                             exception_ov = 1;
                         else
                             result = result33[31:0];
@@ -40,7 +43,7 @@ module Execute_ALU (
             ADDU    : result = vs + vt; //TODO
             SUB     : begin
                         result33 = $signed(vs33) - $signed(vt33);
-                        if (result33[32] != result33[31] && !ExecuteContext.exception.valid)
+                        if (result33[32] != result33[31] && !Exception.valid)
                             exception_ov = 1;
                         else
                             result = result33[31:0];
@@ -52,12 +55,12 @@ module Execute_ALU (
             NOR     : result = ~(vs | vt);
             SLT     : result = ($signed(vs) < $signed(vt)) ? 32'h1 : 32'h0;
             SLTU    : result = (vs < vt) ? 32'h1 : 32'h0;
-            BLTZAL  : result = ExecuteContext.pc + 32'h8;
-            BGEZAL  : result = ExecuteContext.pc + 32'h8;
-            JAL     : result = ExecuteContext.pc + 32'h8;
+            BLTZAL  : result = Pc + 32'h8;
+            BGEZAL  : result = Pc + 32'h8;
+            JAL     : result = Pc + 32'h8;
             ADDI    : begin
                         result33 = vs33 + vi33;
-                        if (result33[32] != result33[31] && !ExecuteContext.exception.valid)
+                        if (result33[32] != result33[31] && !Exception.valid)
                             exception_ov = 1;
                         else
                             result = result33[31:0];

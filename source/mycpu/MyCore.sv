@@ -3,8 +3,8 @@
 
 module MyCore (
     input logic clk, resetn,
-    output ibus_req_t  ireq,
-    input  ibus_resp_t iresp,
+    output flex_bus_req_t  ireq,
+    input  flex_bus_resp_t iresp,
     output dbus_req_t  dreq,
     input  dbus_resp_t dresp,
     input i6 ext_int
@@ -12,98 +12,74 @@ module MyCore (
 
 common_context_t CommonContext, commonContext;
 
-fetch_context_t FetchContext, fetchContext, fetchContext_NORMAL;
+decode_context_t fetch2decode_1, fetch2decode_2;
 
-decode_context_t DecodeContext, decodeContext, decodeContext_NORMAL;
+execute_context_t decode2execute_1, decode2execute_2;
 
-execute_context_t ExecuteContext, executeContext, executeContext_NORMAL;
+memory_context_t execute2memory_1, execute2memory_2;
 
-memory_context_t MemoryContext, memoryContext, memoryContext_NORMAL;
+write_single_context_t memory2write_1, memory2write_2;
 
-write_context_t WriteContext, writeContext_NORMAL;
+jmp_pack_t decodeJmp_1_fwd, decodeJmp_2_fwd, writeJmp_fwd;
 
-jmp_pack_t decodeJmp, writeJmp;
+logic decodeContext_MTC0_exist, executeContext_MTC0_exist, memoryContext_MTC0_exist, WriteContext_MTC0_exist;
+logic decodeContext_ERET_exist, executeContext_ERET_exist, memoryContext_ERET_exist, WriteContext_ERET_exist;
+logic decodeContext_exception_valid, executeContext_exception_valid, memoryContext_exception_valid, WriteContext_exception_valid;
 
-logic jmp_delayed;
+write_reg_t executeContext_write_reg, memoryContext_write_reg, WriteContext_write_reg;
+write_hilo_t executeContext_write_hilo, memoryContext_write_hilo, WriteContext_write_hilo;
 
-Fetch Fetch_inst(.DecodeContextStat(DecodeContext.stat), .*);
+write_reg_t succeed_write_reg[5:0]; //TODO
+write_hilo_t succeed_write_hilo[5:0]; //TODO
 
-Decode Decode_inst(
-    .executeContext_write_reg(executeContext.write_reg),
-    .memoryContext_write_reg(memoryContext.write_reg),
-    .WriteContext_write_reg(WriteContext.write_reg),
-    .executeContext_write_hilo(executeContext.write_hilo),
-    .memoryContext_write_hilo(memoryContext.write_hilo),
-    .WriteContext_write_hilo(WriteContext.write_hilo),
-    .*);
+logic MTC0_exist, ERET_exist;
+assign MTC0_exist = WriteContext_MTC0_exist || memoryContext_MTC0_exist || executeContext_MTC0_exist || decodeContext_MTC0_exist;
+assign ERET_exist = WriteContext_ERET_exist || memoryContext_ERET_exist || executeContext_ERET_exist || decodeContext_ERET_exist;
 
-Execute Execute_inst(.*);
+logic Fetch_valid_1, Fetch_valid_2, Fetch_ready;
+pipeline_stat_t DecodeStat_1, DecodeStat_2, ExecuteStat_1, ExecuteStat_2, MemoryStat_1, MemoryStat_2, WriteStat;
 
-Memory Memory_inst(.WriteContextExceptionValid(WriteContext.exception.valid), .Write_op(WriteContext.op), .*);
+Fetch Fetch_inst(.succeed_exception_valid(decodeContext_exception_valid || executeContext_exception_valid || 
+                                          memoryContext_exception_valid || WriteContext_exception_valid ||
+                                          MTC0_exist || ERET_exist), 
+                 .CommonContext_cp0(CommonContext.cp0), 
+                 .valid_1(Fetch_valid_1), 
+                 .valid_2(Fetch_valid_2), 
+                 .ready(Fetch_ready),
+                 .*);
 
-Write Write_inst(.*);
+Decode Decode_inst(.succeed_exception_valid(executeContext_exception_valid || memoryContext_exception_valid || WriteContext_exception_valid), 
+                   .jmp_1(decodeJmp_1_fwd), .jmp_2(decodeJmp_2_fwd),
+                   .exception_valid(decodeContext_exception_valid),
+                   .ERET_exist(decodeContext_ERET_exist), 
+                   .MTC0_exist(decodeContext_MTC0_exist),
+                   .*);
 
-pipeline_stat_t FetchStat, DecodeStat, ExecuteStat, MemoryStat, WriteStat;
+Execute Execute_inst(.succeed_exception_valid(memoryContext_exception_valid || WriteContext_exception_valid), 
+                     .executeContext_write_reg_1(succeed_write_reg[1]),
+                     .executeContext_write_hilo_1(succeed_write_hilo[1]),
+                     .executeContext_write_reg_2(succeed_write_reg[0]),
+                     .executeContext_write_hilo_2(succeed_write_hilo[0]),
+                     .*);
 
-Pipeline_Stat Pipeline_Stat_Inst(.*);
+Memory Memory_inst(.succeed_exception_valid(WriteContext_exception_valid), 
+                   .write_reg_1(succeed_write_reg[3]),
+                   .write_hilo_1(succeed_write_hilo[3]),
+                   .write_reg_2(succeed_write_reg[2]),
+                   .write_hilo_2(succeed_write_hilo[2]),
+                   .exception_valid(memoryContext_exception_valid), 
+                   .ERET_exist(memoryContext_ERET_exist), 
+                   .MTC0_exist(memoryContext_MTC0_exist),
+                   .*);
 
-// Bubble Stall 由 pipelinestat_t 单独控制，
-// 流水线寄存器在 PipelineStat 中统一更新。
-// 可以加一个状态机转移结果数组，可以对所有值进行赋值。
-
-always_comb begin
-    fetchContext_NORMAL = FETCH_CONTEXT_RESET;
-    fetchContext_NORMAL.stat = SF_FETCH;
-    if (fetchContext.writeJmp.stat != J_NOP)
-        fetchContext_NORMAL.pc = fetchContext.writeJmp.pc_dst;
-    else if (fetchContext.decodeJmp.stat != J_NOP)
-        fetchContext_NORMAL.pc = fetchContext.decodeJmp.pc_dst;
-    else
-        fetchContext_NORMAL.pc = fetchContext.next_pc;
-    fetchContext_NORMAL.next_pc = fetchContext_NORMAL.pc + 4;
-
-    decodeContext_NORMAL = DECODE_CONTEXT_RESET;
-    decodeContext_NORMAL.stat = SD_DECODE;
-    decodeContext_NORMAL.pc = fetchContext.pc;
-    decodeContext_NORMAL.instr = fetchContext.instr;
-    decodeContext_NORMAL.exception = fetchContext.exception;
-
-    executeContext_NORMAL = EXECUTE_CONTEXT_RESET;
-    if (decodeContext.op == MULT || decodeContext.op == MULTU)
-        executeContext_NORMAL.stat = SE_MULT;
-    else if (decodeContext.op == DIV || decodeContext.op == DIVU)
-        executeContext_NORMAL.stat = SE_DIV;
-    else
-        executeContext_NORMAL.stat = SE_ALU;
-    executeContext_NORMAL.pc = decodeContext.pc;
-    executeContext_NORMAL.op = decodeContext.op;
-    executeContext_NORMAL.vars = decodeContext.vars;
-    executeContext_NORMAL.memory_args = decodeContext.memory_args;
-    executeContext_NORMAL.write_reg = decodeContext.write_reg;
-    executeContext_NORMAL.write_hilo = decodeContext.write_hilo;
-    executeContext_NORMAL.exception = decodeContext.exception;
-
-    memoryContext_NORMAL = MEMORY_CONTEXT_RESET;
-    memoryContext_NORMAL.pc = executeContext.pc;
-    memoryContext_NORMAL.op = executeContext.op;
-    if (executeContext.memory_args.valid == 1 && executeContext.memory_args.write == 0)
-        memoryContext_NORMAL.stat = SM_LOAD;
-    else if (executeContext.memory_args.valid == 1 && executeContext.memory_args.write == 1)
-        memoryContext_NORMAL.stat = SM_STORE;
-    else
-        memoryContext_NORMAL.stat = SM_IDLE;
-    memoryContext_NORMAL.memory_args = executeContext.memory_args;
-    memoryContext_NORMAL.write_reg = executeContext.write_reg;
-    memoryContext_NORMAL.write_hilo = executeContext.write_hilo;
-    memoryContext_NORMAL.exception = executeContext.exception;
-
-    writeContext_NORMAL = WRITE_CONTEXT_RESET;
-    writeContext_NORMAL.pc = memoryContext.pc;
-    writeContext_NORMAL.op = memoryContext.op;
-    writeContext_NORMAL.write_reg = memoryContext.write_reg;
-    writeContext_NORMAL.write_hilo = memoryContext.write_hilo;
-    writeContext_NORMAL.exception = memoryContext.exception;
-end
+Write Write_inst(.write_reg_1(succeed_write_reg[5]),
+                 .write_hilo_1(succeed_write_hilo[5]),
+                 .write_reg_2(succeed_write_reg[4]),
+                 .write_hilo_2(succeed_write_hilo[4]),
+                 .exception_valid(WriteContext_exception_valid), 
+                 .ERET_exist(WriteContext_ERET_exist), 
+                 .MTC0_exist(WriteContext_MTC0_exist),
+                 .*);
 
 always_ff @(posedge clk) begin
     // Common
@@ -112,47 +88,6 @@ always_ff @(posedge clk) begin
     end
     else
         CommonContext <= commonContext;
-    
-    // Fetch
-    if(~resetn || ~FetchStat.resetn)
-        FetchContext <= FETCH_CONTEXT_RESET;
-    else if (FetchStat.ready == 0)
-        FetchContext <= fetchContext;
-    else
-        FetchContext <= fetchContext_NORMAL;
-
-    // Decode
-    if(~resetn || ~DecodeStat.resetn || (DecodeStat.ready == 1 && FetchStat.valid == 0))
-        DecodeContext <= DECODE_CONTEXT_RESET;
-    else if (DecodeStat.ready == 0)
-        DecodeContext <= decodeContext;
-    else
-        DecodeContext <= decodeContext_NORMAL;
-    
-    // Execute
-    if(~resetn || ~ExecuteStat.resetn || (ExecuteStat.ready == 1 && DecodeStat.valid == 0))
-        ExecuteContext <= EXECUTE_CONTEXT_RESET;
-    else if (ExecuteStat.ready == 0)
-        ExecuteContext <= executeContext;
-    else
-        ExecuteContext <= executeContext_NORMAL;
-
-    // Memory
-    if(~resetn || ~MemoryStat.resetn || (MemoryStat.ready == 1 && ExecuteStat.valid == 0))
-        MemoryContext <= MEMORY_CONTEXT_RESET;
-    else if (MemoryStat.ready == 0)
-        MemoryContext <= memoryContext;
-    else
-        MemoryContext <= memoryContext_NORMAL;
-
-    // Write
-    if(~resetn || ~WriteStat.resetn || (WriteStat.ready == 1 && MemoryStat.valid == 0))
-        WriteContext <= WRITE_CONTEXT_RESET;
-    else if (WriteStat.ready == 0) begin
-        //pass
-    end
-    else
-        WriteContext <= writeContext_NORMAL;
 end
 
 endmodule
