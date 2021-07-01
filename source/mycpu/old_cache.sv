@@ -70,7 +70,7 @@ module DCache (
             {tag[2], index[2], offset[2], offset_byte[2]} = '0;
             strobe_i4[2] = '0;
         end
-        else if (CacheContext.stat == SC_FETCH_IDLE || CacheContext.stat == SC_FLUSH_IDLE) begin
+        else if (CacheContext.stat == SC_FETCH_IDLE) begin
             {tag[0], index[0], offset[0], offset_byte[0]} = in_dreq[0].addr;
             strobe_i4[0] = in_dreq[0].strobe;
             {tag[1], index[1], offset[1], offset_byte[1]} = in_dreq[1].addr;
@@ -166,6 +166,7 @@ module DCache (
         comp_reqs[2][1] = offset[1] == busy_offset;
     end
 
+   
     always_comb begin 
         cacheContext = CacheContext;
         in_dresp = '0;
@@ -312,38 +313,24 @@ module DCache (
                                     cacheContext.resp[0] = '0; 
                                     cacheContext.stat = SC_SEC;
                                 end
-                                // 如果他们的index和offset target_pos均相同
+                                // 如果他们的index和offset均相同
                                 2'b11: begin
                                     // if the second req is to write, then do parallelly.
                                     // the second one will overwrite the first one.
-                                    if (write_en[1] == 1'b1 && write_en[0] == 1'b1) begin
-                                        
-                                        `RW_CACHE(1'b0);  
-                                        for (int j = 0; j < 4; j++) begin
-                                            if (strobe_i4[1][j] == 1'b1) begin
-                                                ram_switch[{index[1], offset[1]}].wdata[(((j + 1) << 3) - 1)-:8] = in_dreq[1].data[(((j + 1) << 3) - 1)-:8];
-                                            end
+                                    if (write_en[1] == 1'b1) begin
+                                        for (int i = 0; i < 2; i++) begin
+                                            `RW_CACHE(i);  
                                         end
-                                      
-                                        ram_switch[{index[0], offset[0]}].strobe = (strobe_i4[0] | strobe_i4[1]);
                                         cacheContext.stat = SC_IDLE;
                                         cacheContext.resp = '0;
                                     end
                                     else if ((write_en[0] == 1'b1)) begin
                                         // if the reqs manipulate the same position, then do parallelly
-                                            `RW_CACHE(1'b0);
-                                            in_dresp[1].data = ram_rdata[{index[1], offset[1]}];
-                                            cacheContext.resp[1].data = ram_rdata[{index[1], offset[1]}];
-                                            for (int j = 0; j < 4; j++) begin
-                                                if (strobe_i4[0][j] == 1'b1) begin
-                                                    in_dresp[1].data[(((j + 1) << 3) - 1)-:8] = in_dreq[0].data[(((j + 1) << 3) - 1)-:8];
-                                                    cacheContext.resp[1].data[(((j + 1) << 3) - 1)-:8] = in_dreq[0].data[(((j + 1) << 3) - 1)-:8];
-                                                end
-                                            end    
-                                            
+                                            `RW_CACHE(1'b0);    
+                                            in_dresp[1].data = in_dreq[0].data;
                                             in_dresp[1].addr_ok = 1'b1;
                                             in_dresp[1].data_ok = 1'b1;
-                                            
+                                            cacheContext.resp[1].data = in_dreq[0].data;
                                             cacheContext.resp[1].addr_ok = 1'b1;
                                             cacheContext.resp[1].data_ok = 1'b1;
                                             cacheContext.stat = SC_IDLE;
@@ -355,7 +342,6 @@ module DCache (
                                             `RW_CACHE(i);    
                                         end
                                         cacheContext.resp = '0; 
-                                        cacheContext.stat = SC_IDLE;
                                     end
                                 end  
                                 default: begin
@@ -579,12 +565,7 @@ module DCache (
                         cacheContext.resp[busy_req_index].data_ok = 1'b1;
                         cacheContext.resp[busy_req_index].data = dcresp.data;
                         if (|strobe_i4[2]) begin
-                            for (int i = 0; i < 4; i++) begin
-                                if (strobe_i4[2][i] == 1'b1) begin
-                                    ram_switch[{index[2], busy_offset}].wdata[(((i + 1) << 3) - 1)-:8] = CacheContext.busy_req.data[(((i + 1) << 3) - 1)-:8];
-                                end
-                            end
-                          
+                            ram_switch[{index[2], busy_offset}].wdata = CacheContext.busy_req.data;
                             cacheContext.cache_set_meta[index[2]].cache_line_meta[flush_position[2]].dirty = 1;
                         end
                         else begin
@@ -677,12 +658,7 @@ module DCache (
                                 cacheContext.resp[~busy_req_index].data_ok = 1'b1;
                                 cacheContext.resp[~busy_req_index].addr_ok = 1'b1;
                                 if (|strobe_i4[~busy_req_index]) begin
-                                    for (int i = 0; i < 4; i++) begin
-                                        if (strobe_i4[~busy_req_index][i] == 1'b1) begin
-                                            ram_switch[{index[~busy_req_index], busy_offset}].wdata[(((i + 1) << 3) - 1)-:8] = in_dreq[~busy_req_index].data[(((i + 1) << 3) - 1)-:8];
-                                        end
-                                    end
-                                 
+                                    ram_switch[{index[~busy_req_index], offset[~busy_req_index]}].wdata = CacheContext.req[~busy_req_index].data;
                                     cacheContext.cache_set_meta[index[~busy_req_index]].cache_line_meta[target_position[~busy_req_index]].dirty = 1;
                                 end
                                 else begin
@@ -923,16 +899,11 @@ module DCache (
                         cacheContext.cache_set_meta[index[2]].cache_line_meta[flush_position[2]].valid = 1;
                     end
                     if (busy_offset == offset[2] && (|strobe_i4[2])) begin
-                        for (int i = 0; i < 4; i++) begin
-                            if (strobe_i4[2][i] == 1'b1) begin
-                                ram_switch[{index[2], busy_offset}].wdata[(((i + 1) << 3) - 1)-:8] = CacheContext.busy_req.data[(((i + 1) << 3) - 1)-:8];
-                            end
-                        end
-                   
+                        ram_switch[{index[2], busy_offset}].wdata = CacheContext.busy_req.data;
                         cacheContext.cache_set_meta[index[2]].cache_line_meta[flush_position[2]].dirty = 1;
                     end
                    
-                    //to do 把strobe因素加进去
+                    
                     //只有两种情况可以在这个时候让人离开：均命中
                     if (~in_dreq[0].valid && ~in_dreq[1].valid) begin
                         cacheContext.resp = '0;
@@ -954,24 +925,12 @@ module DCache (
                                         cacheContext.resp[0].data_ok = 1'b1;
                                         cacheContext.resp[0].addr_ok = 1'b1;
                                         if (|strobe_i4[0]) begin
-                                            for (int i = 0; i < 4; i++) begin
-                                                if (strobe_i4[0][i] == 1'b1) begin
-                                                    ram_switch[{index[0], busy_offset}].wdata[(((i + 1) << 3) - 1)-:8] = in_dreq[0].data[(((i + 1) << 3) - 1)-:8];
-                                                end
-                                            end
-                                            
+                                            ram_switch[{index[0], offset[0]}].wdata = in_dreq[0].data;
                                             cacheContext.cache_set_meta[index[0]].cache_line_meta[target_position[0]].dirty = 1;
                                         end
                                         if (CacheContext.busy_req.addr[31:2] == in_dreq[0].addr[31:2] && (|strobe_i4[2])) begin
-                                            in_dresp[0].data = dcresp.data;
-                                            cacheContext.resp[0].data = dcresp.data;
-                                            // problem
-                                            for (int i = 0; i < 4; i++) begin
-                                                if (strobe_i4[2][i] == 1'b1) begin
-                                                    in_dresp[0].data[(((i + 1) << 3) - 1)-:8] = CacheContext.busy_req.data[(((i + 1) << 3) - 1)-:8];
-                                                    cacheContext.resp[0].data[(((i + 1) << 3) - 1)-:8] = CacheContext.busy_req.data[(((i + 1) << 3) - 1)-:8];
-                                                end
-                                            end
+                                            in_dresp[0].data = CacheContext.busy_req.data;
+                                            cacheContext.resp[0].data = CacheContext.busy_req.data;
                                         end
                                         else begin
                                             in_dresp[0].data = dcresp.data;
@@ -1012,22 +971,13 @@ module DCache (
                                         cacheContext.resp[1].data_ok = 1'b1;
                                         cacheContext.resp[1].addr_ok = 1'b1;
                                         if (|strobe_i4[1]) begin
-                                            for (int i = 0; i < 4; i++) begin
-                                                if (strobe_i4[1][i] == 1'b1) begin
-                                                    ram_switch[{index[1], busy_offset}].wdata[(((i + 1) << 3) - 1)-:8] = in_dreq[1].data[(((i + 1) << 3) - 1)-:8];
-                                                end
-                                            end
+                                            ram_switch[{index[1], offset[1]}].wdata = in_dreq[1].data;
                                             cacheContext.cache_set_meta[index[1]].cache_line_meta[target_position[1]].dirty = 1;
                                         end
                                         if (CacheContext.busy_req.addr == in_dreq[1].addr && (|strobe_i4[2])) begin
-                                            in_dresp[1].data = dcresp.data;
-                                            cacheContext.resp[1].data = dcresp.data;
-                                            for (int i = 0; i < 4; i++) begin
-                                                if (strobe_i4[2][i] == 1'b1) begin
-                                                    in_dresp[1].data[(((i + 1) << 3) - 1)-:8] = CacheContext.busy_req.data[(((i + 1) << 3) - 1)-:8];
-                                                    cacheContext.resp[1].data[(((i + 1) << 3) - 1)-:8] = CacheContext.busy_req.data[(((i + 1) << 3) - 1)-:8];
-                                                end
-                                            end
+                                            in_dresp[1].data = CacheContext.busy_req.data;
+                                            cacheContext.resp[1].data = CacheContext.busy_req.data;
+
                                         end
                                         else begin
                                             in_dresp[1].data = dcresp.data;
@@ -1068,22 +1018,12 @@ module DCache (
                                         cacheContext.resp[0].data_ok = 1'b1;
                                         cacheContext.resp[0].addr_ok = 1'b1;
                                         if (|strobe_i4[0]) begin
-                                            for (int i = 0; i < 4; i++) begin
-                                                if (strobe_i4[0][i] == 1'b1) begin
-                                                    ram_switch[{index[0], busy_offset}].wdata[(((i + 1) << 3) - 1)-:8] = in_dreq[0].data[(((i + 1) << 3) - 1)-:8];
-                                                end
-                                            end
+                                            ram_switch[{index[0], offset[0]}].wdata = in_dreq[0].data;
                                             cacheContext.cache_set_meta[index[0]].cache_line_meta[target_position[0]].dirty = 1;
                                         end
                                         if (CacheContext.busy_req.addr[31:2] == in_dreq[0].addr[31:2] && (|strobe_i4[2])) begin
-                                            in_dresp[0].data = dcresp.data;
-                                            cacheContext.resp[0].data = dcresp.data;
-                                            for (int i = 0; i < 4; i++) begin
-                                                if (strobe_i4[2][i] == 1'b1) begin
-                                                    in_dresp[0].data[(((i + 1) << 3) - 1)-:8] = CacheContext.busy_req.data[(((i + 1) << 3) - 1)-:8];
-                                                    cacheContext.resp[0].data[(((i + 1) << 3) - 1)-:8] = CacheContext.busy_req.data[(((i + 1) << 3) - 1)-:8];
-                                                end
-                                            end
+                                            in_dresp[0].data = CacheContext.busy_req.data;
+                                            cacheContext.resp[0].data = CacheContext.busy_req.data;
                                         end
                                         else begin
                                             in_dresp[0].data = dcresp.data;
@@ -1124,22 +1064,12 @@ module DCache (
                                         cacheContext.resp[1].data_ok = 1'b1;
                                         cacheContext.resp[1].addr_ok = 1'b1;
                                         if (|strobe_i4[1]) begin
-                                            for (int i = 0; i < 4; i++) begin
-                                                if (strobe_i4[1][i] == 1'b1) begin
-                                                    ram_switch[{index[1], busy_offset}].wdata[(((i + 1) << 3) - 1)-:8] = in_dreq[1].data[(((i + 1) << 3) - 1)-:8];
-                                                end
-                                            end
+                                            ram_switch[{index[1], offset[1]}].wdata = in_dreq[1].data;
                                             cacheContext.cache_set_meta[index[1]].cache_line_meta[target_position[1]].dirty = 1;
                                         end
                                         if (CacheContext.busy_req.addr == in_dreq[1].addr && (|strobe_i4[2])) begin
-                                            in_dresp[1].data = dcresp.data;
-                                            cacheContext.resp[1].data = dcresp.data;
-                                            for (int i = 0; i < 4; i++) begin
-                                                if (strobe_i4[2][i] == 1'b1) begin
-                                                    in_dresp[1].data[(((i + 1) << 3) - 1)-:8] = CacheContext.busy_req.data[(((i + 1) << 3) - 1)-:8];
-                                                    cacheContext.resp[1].data[(((i + 1) << 3) - 1)-:8] = CacheContext.busy_req.data[(((i + 1) << 3) - 1)-:8];
-                                                end
-                                            end
+                                            in_dresp[1].data = CacheContext.busy_req.data;
+                                            cacheContext.resp[1].data = CacheContext.busy_req.data;
                                         end
                                         else begin
                                             in_dresp[1].data = dcresp.data;

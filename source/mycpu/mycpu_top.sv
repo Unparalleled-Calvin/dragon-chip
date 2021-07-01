@@ -73,7 +73,10 @@ module mycpu_top (
 `else
     cbus_req_t  oreq;
     cbus_resp_t oresp;
-
+    assign debug_wb_pc       = top.core.Write_inst.w_pc;
+    assign debug_wb_rf_wen   = top.core.Write_inst.w_enable; 
+    assign debug_wb_rf_wnum  = top.core.Write_inst.w_reg;
+    assign debug_wb_rf_wdata = top.core.Write_inst.w_value;
     VTop top(.clk(aclk), .resetn(aresetn), .*);
     CBusToAXI cvt(.creq(oreq), .cresp(oresp), .*);
 `endif

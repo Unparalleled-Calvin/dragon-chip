@@ -14,66 +14,19 @@ module VTop (
 
     flex_bus_req_t  ireq;
     flex_bus_resp_t iresp;
-    dbus_req_t  dreq;
-    dbus_resp_t dresp;
+    dbus_req_t [1:0] dreq;
+    dbus_resp_t [1:0] dresp;
     cbus_req_t  icreq,  dcreq;
     cbus_resp_t icresp, dcresp;
 
-    MyCore core(.*);
+    MyCore core(.dreq_1(dreq[0]), .dreq_2(dreq[1]), .dresp_1(dresp[0]), .dresp_2(dresp[1]), .*);
 
     //IBusToCBus icvt(.*);
     //DBusToCBus dcvt(.*);
     
     ICache icvt(.*);
-    
-    dbus_req_t  [1:0] mux_dreq;
-    dbus_resp_t [1:0] mux_dresp;
-    cbus_req_t  [1:0] mux_creq;
-    cbus_resp_t [1:0] mux_cresp;
-    
-    logic d_block;
-    
-    always_comb begin
-        mux_dreq = 0;
-        mux_cresp = 0;
 
-        if (dreq.addr[31:29] == 3'b101) begin
-            if (!d_block) begin
-                mux_dreq[1] = dreq;
-                dresp = mux_dresp[1];
-                dcreq = mux_creq[1];
-                mux_cresp[1] = dcresp;
-            end
-            else begin
-                mux_dreq[0] = '0;
-                dresp = mux_dresp[0];
-                dcreq = mux_creq[0];
-                mux_cresp[0] = dcresp;
-            end
-        end else begin
-            mux_dreq[0] = dreq;
-            dresp = mux_dresp[0];
-            dcreq = mux_creq[0];
-            mux_cresp[0] = dcresp;
-        end
-    end
-    
-    DCache dcvt0(
-        .dreq(mux_dreq[0]),
-        .dresp(mux_dresp[0]),
-        .dcreq(mux_creq[0]),
-        .dcresp(mux_cresp[0]),
-        .block(d_block),
-        .*
-    );
-
-    DBusToCBus dcvt1(
-        .dreq(mux_dreq[1]),
-        .dresp(mux_dresp[1]),
-        .dcreq(mux_creq[1]),
-        .dcresp(mux_cresp[1]),
-        .*
-    );
+    DCache dcvt0(.*);
     
     cbus_req_t  oreq_v;
     
@@ -84,6 +37,7 @@ module VTop (
         .oresp(oresp),
         .*
     );
+
     
     assign oreq.valid = oreq_v.valid;
     assign oreq.is_write = oreq_v.is_write;

@@ -4,7 +4,7 @@
 module Memory_single (
     input logic clk, resetn,
     input memory_context_t execute2memory,
-
+    input logic exception_valid_1,
     output dbus_req_t  dreq,
     input dbus_resp_t  dresp,
     output write_single_context_t memory2write,
@@ -13,6 +13,7 @@ module Memory_single (
     output write_hilo_t write_hilo,
     input pipeline_stat_t MemoryStat,
     input logic succeed_exception_valid,
+    
     output logic exception_valid, ERET_exist, MTC0_exist,
     output logic done, done_doned, error
 );
@@ -50,7 +51,7 @@ module Memory_single (
                            Memory_args.msize == MSIZE4 && 
                            Memory_args.addr[1:0] != 2'b0;
 
-    assign dreq.valid = valid_0 && (!msize2_addr_error) && (!msize4_addr_error);
+    assign dreq.valid = valid_0 && (!msize2_addr_error) && (!msize4_addr_error) && (!exception_valid_1);
     assign dreq.addr = Memory_args.addr;
     assign dreq.size = Memory_args.msize;
     Memory_Select_Dreq_Strobe Memory_Select_Dreq_Strobe_Inst(.MemoryArgs(Memory_args), .strobe(dreq.strobe));

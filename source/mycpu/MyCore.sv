@@ -5,8 +5,10 @@ module MyCore (
     input logic clk, resetn,
     output flex_bus_req_t  ireq,
     input  flex_bus_resp_t iresp,
-    output dbus_req_t  dreq,
-    input  dbus_resp_t dresp,
+    // output dbus_req_t  dreq,
+    // input  dbus_resp_t dresp,
+    output dbus_req_t  dreq_1, dreq_2,
+    input dbus_resp_t  dresp_1, dresp_2,
     input i6 ext_int
 );
 
