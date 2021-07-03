@@ -75,7 +75,7 @@ module VTop (
     assign oreq.valid = oreq_v.valid;
     assign oreq.is_write = oreq_v.is_write;
     assign oreq.size = oreq_v.size;
-    AddrTrans addrtrans_o(.paddr(oreq.addr), .vaddr(oreq_v.addr));
+    AddrTrans addrtrans_o(.paddr(oreq.addr), .vaddr(oreq_v.addr)); //这个地方可以改成inline的，不要再用模块化处理了
     assign oreq.strobe = oreq_v.strobe;
     assign oreq.data = oreq_v.data;
     assign oreq.len = oreq_v.len;
