@@ -1,9 +1,10 @@
 `include "common.svh"
 `include "mycpu/mycpu.svh"
 
-module Decode_Memory (
+module Decode_Memory_args (
     input op_t op,
     input word_t vt,
+    input memory_args_t Memory_args,
     output memory_args_t memory_args
 );
 

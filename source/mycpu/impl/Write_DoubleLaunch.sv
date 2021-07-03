@@ -1,7 +1,7 @@
 `include "common.svh"
 `include "mycpu/mycpu.svh"
 
-module Write (
+module Write_Double (
     input logic clk, resetn,
     input common_context_t CommonContext,
     input write_single_context_t memory2write_1, memory2write_2, 

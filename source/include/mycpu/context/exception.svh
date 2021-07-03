@@ -11,8 +11,6 @@ typedef struct packed {
     addr_t pc_src;
     // currently in delay slot?
     logic delayed;
-    // PC of delayed branches，是分支代码所在位置
-    addr_t delayed_pc_src;
 } exception_args_t;
 
 `define THROW(exception, ecode, pc) \

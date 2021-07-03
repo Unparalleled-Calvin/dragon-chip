@@ -8,17 +8,22 @@ module DCache (
     output dbus_resp_t dresp,
     
     output cbus_req_t  dcreq,
-    input  cbus_resp_t dcresp
+    input  cbus_resp_t dcresp,
+    output logic block
 );
+    assign block = CacheContext.stat != SC_IDLE;
+    
     dbus_req_t  in_dreq;
     dbus_resp_t in_dresp;
-    //assign in_dreq = dreq;
-    //assign dresp = in_dresp;
+    assign in_dreq = dreq;
+    assign dresp = in_dresp;
+    /*
     SkidBuffer SkidBuffer_inst(.m_req(dreq), 
                                .m_resp(dresp),
                                .s_req(in_dreq),
                                .s_resp(in_dresp),
                                .*);
+    */
     cache_state_t Cache_state /* verilator public_flat_rd */;
     assign Cache_state = CacheContext.stat;
     
@@ -49,27 +54,15 @@ module DCache (
     always_comb begin
         target_cache_set_meta = CacheContext.cache_set_meta[index];
         
-        unique if (target_cache_set_meta.cache_line_meta[0].valid && target_cache_set_meta.cache_line_meta[0].tag == tag) begin
-            cached = 1;
-            target_position = 0;
-        end
-        else if (target_cache_set_meta.cache_line_meta[1].valid && target_cache_set_meta.cache_line_meta[1].tag == tag) begin
-            cached = 1;
-            target_position = 1;
-        end
-        else if (target_cache_set_meta.cache_line_meta[2].valid && target_cache_set_meta.cache_line_meta[2].tag == tag) begin
-            cached = 1;
-            target_position = 2;
-        end
-        else if (target_cache_set_meta.cache_line_meta[3].valid && target_cache_set_meta.cache_line_meta[3].tag == tag) begin
-            cached = 1;
-            target_position = 3;
-        end
-        else begin
-            cached = 0;
-            target_position = 0;
-        end
-
+        cached = 0;
+        target_position = 0;
+        
+        for (int i = 0; i < cache_line_size; i++)
+            if (target_cache_set_meta.cache_line_meta[i].valid && target_cache_set_meta.cache_line_meta[i].tag == tag) begin
+                cached = 1;
+                target_position = i[cache_line_len - 1:0];
+            end
+        
         target_cache_line_meta = target_cache_set_meta.cache_line_meta[target_position];
     end
     
@@ -158,13 +151,27 @@ module DCache (
                     ram_switch[{index, flush_position}].en = 1;
                     ram_switch[{index, flush_position}].offset = CacheContext.offset;
                     ram_switch[{index, flush_position}].strobe = 4'b1111;
-                    ram_switch[{index, flush_position}].wdata = dcresp.data;
+                    if (CacheContext.offset == offset) begin
+                        if (|strobe_i4) begin
+                            ram_switch[{index, flush_position}].wdata = CacheContext.req.data;
+                            cacheContext.cache_set_meta[index].cache_line_meta[target_position].dirty = 1;
+                        end
+                        else begin
+                            ram_switch[{index, flush_position}].wdata = dcresp.data;
+                        end
+                        in_dresp.addr_ok = 0;
+                        in_dresp.data_ok = 1;
+                        in_dresp.data = dcresp.data;
+                    end
+                    else begin
+                        ram_switch[{index, flush_position}].wdata = dcresp.data;
+                    end
                     if (CacheContext.offset == 4'hf) begin // !dcresp.last
-                        cacheContext.stat = SC_READY;
+                        cacheContext.stat = SC_IDLE;
                         cacheContext.offset = '0;
                         cacheContext.cache_set_meta[index].cache_line_meta[flush_position].tag = tag;
                         cacheContext.cache_set_meta[index].cache_line_meta[flush_position].valid = 1;
-                        cacheContext.cache_set_meta[index].cache_line_meta[flush_position].dirty = 0;
+                        cacheContext.cache_set_meta[index].cache_line_meta[flush_position].dirty = |strobe_i4;
                         cacheContext.cache_set_meta[index].flush_position = CacheContext.cache_set_meta[index].flush_position + 1;
                     end
                     else begin
@@ -193,22 +200,6 @@ module DCache (
                         cacheContext.stat = SC_FETCH;
                         cacheContext.offset = '0;
                     end
-                end
-            end
-            SC_READY: begin
-                ram_switch[{index, target_position}].en = 1;
-                ram_switch[{index, target_position}].offset = offset;
-                ram_switch[{index, target_position}].strobe = strobe_i4;
-                ram_switch[{index, target_position}].wdata = CacheContext.req.data;
-                
-                in_dresp.addr_ok = 0;
-                in_dresp.data_ok = 1;
-                in_dresp.data = ram_rdata[{index, target_position}];
-                cacheContext.stat = SC_IDLE;
-                cacheContext.offset = '0;
-                cacheContext.req = '0;
-                if (|CacheContext.req.strobe) begin
-                    cacheContext.cache_set_meta[index].cache_line_meta[target_position].dirty = 1;
                 end
             end
             default: begin

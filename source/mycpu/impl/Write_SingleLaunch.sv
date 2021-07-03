@@ -1,7 +1,7 @@
 `include "common.svh"
 `include "mycpu/mycpu.svh"
 
-module Write (
+module Write_SingleLaunch (
     input logic clk, resetn,
     input common_context_t CommonContext,
     input write_single_context_t memory2write_1, memory2write_2, 
@@ -18,11 +18,11 @@ module Write (
     
     always_comb begin
         WriteStat = 2'b11;
-        /*
+        
         if (WriteContext.valid2) begin
             WriteStat.valid = 0;
             WriteStat.ready = 0;
-        end*/
+        end
     end
     
     addr_t w_pc /* verilator public_flat_rd */;
@@ -74,7 +74,6 @@ module Write (
     Write_Jmp Write_Jmp_inst_2(.WriteContext(WriteContext.write_2), .CommonContext(commonContext), .writeJmp(writeJmp_2));
     
     always_comb begin
-        /*
         if (WriteContext.valid2) begin
             commonContext = CommonContext;
             writeJmp_fwd = '0;
@@ -86,7 +85,7 @@ module Write (
                           !WriteContext.write_1.exception.valid && 
                           WriteContext.write_1.write_reg.dst != '0}};
         end
-        else*/ begin
+        else begin
             if (WriteContext.write_1.exception.valid || WriteContext.write_1.op == ERET)
                 commonContext = commonContext_1;
             else
@@ -109,9 +108,9 @@ module Write (
         // Write
         if(~resetn)
             WriteContext <= WRITE_CONTEXT_RESET;
-        /*else if (WriteStat.ready == 0) begin
+        else if (WriteStat.ready == 0) begin
             WriteContext.valid2 <= 0;
-        end*/
+        end
         else begin
             WriteContext.valid2 <= memory2write_1.op != NOP;
             WriteContext.write_1 <= memory2write_1;

@@ -4,71 +4,83 @@
 module Decode_Select_Jmp (
     input op_t op,
     input addr_t pc_src, 
-    input vars_t vars,
-
-    output jmp_pack_t jmp,
-    output logic jmp_delayed
+    input word_t vs, vt, vi, vj,
+    input jmp_pack_t Jmp,
+    output jmp_pack_t jmp
 );
 
 always_comb begin
-    jmp.stat = J_NOP;
-    jmp.pc_src = pc_src;
-    jmp.pc_dst = 32'h0;
-    jmp_delayed = 0;
+    jmp = Jmp;
 
     unique case (op)
         JR, JALR: begin
-            jmp.stat = J_REG;
-            jmp.pc_dst = vars.vs;
-            jmp_delayed = 1;
+            jmp.en  = 1;
+            jmp.pc_dst = vs;
         end
         BLTZ, BLTZAL: begin
-            if ($signed(vars.vs) < $signed(32'h0)) begin
-                jmp.stat = J_REL;
-                jmp.pc_dst = pc_src + (vars.vi << 2) + 4;
+            if ($signed(vs) < $signed(32'h0)) begin
+                jmp.en  = 1;
+                jmp.pc_dst = pc_src + (vi << 2) + 4;
             end
-            jmp_delayed = 1;
+            else begin
+                jmp.en  = 0;
+                jmp.pc_dst = '0;
+            end
         end
         BGEZ, BGEZAL: begin
-            if ($signed(vars.vs) >= $signed(32'h0)) begin
-                jmp.stat = J_REL;
-                jmp.pc_dst = pc_src + (vars.vi << 2) + 4;
+            if ($signed(vs) >= $signed(32'h0)) begin
+                jmp.en  = 1;
+                jmp.pc_dst = pc_src + (vi << 2) + 4;
             end
-            jmp_delayed = 1;
+            else begin
+                jmp.en  = 0;
+                jmp.pc_dst = '0;
+            end
         end
 
         J, JAL: begin
-            jmp.stat = J_DIR;
-            jmp.pc_dst = vars.vj;
-            jmp_delayed = 1;
+            jmp.en  = 1;
+            jmp.pc_dst = vj;
         end
         BEQ: begin 
-            if (vars.vs == vars.vt) begin
-                jmp.stat = J_REL;
-                jmp.pc_dst = pc_src + (vars.vi << 2) + 4;
+            if (vs == vt) begin
+                jmp.en  = 1;
+                jmp.pc_dst = pc_src + (vi << 2) + 4;
             end
-            jmp_delayed = 1;
+            else begin
+                jmp.en  = 0;
+                jmp.pc_dst = '0;
+            end
         end
         BNE: begin
-            if (vars.vs != vars.vt) begin
-                jmp.stat = J_REL;
-                jmp.pc_dst = pc_src + (vars.vi << 2) + 4;
+            if (vs != vt) begin
+                jmp.en  = 1;
+                jmp.pc_dst = pc_src + (vi << 2) + 4;
             end
-            jmp_delayed = 1;
+            else begin
+                jmp.en  = 0;
+                jmp.pc_dst = '0;
+            end
         end
         BLEZ: begin
-            if ($signed(vars.vs) <= $signed(32'h0)) begin
-                jmp.stat = J_REL;
-                jmp.pc_dst = pc_src + (vars.vi << 2) + 4;
+            if ($signed(vs) <= $signed(32'h0)) begin
+                jmp.en  = 1;
+                jmp.pc_dst = pc_src + (vi << 2) + 4;
             end
-            jmp_delayed = 1;
+            else begin
+                jmp.en  = 0;
+                jmp.pc_dst = '0;
+            end
         end
         BGTZ: begin
-            if ($signed(vars.vs) > $signed(32'h0)) begin
-                jmp.stat = J_REL;
-                jmp.pc_dst = pc_src + (vars.vi << 2) + 4;
+            if ($signed(vs) > $signed(32'h0)) begin
+                jmp.en  = 1;
+                jmp.pc_dst = pc_src + (vi << 2) + 4;
             end
-            jmp_delayed = 1;
+            else begin
+                jmp.en  = 0;
+                jmp.pc_dst = '0;
+            end
         end
         default: begin
         end

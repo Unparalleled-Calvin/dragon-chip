@@ -61,6 +61,7 @@ void CBusDevice::eval_req(const CBusReq &req) {
 }
 
 void CBusDevice::sync() {
+    
     if (enable) {
         if (tx.busy && tx.is_write) {
             // perform write operation if needed

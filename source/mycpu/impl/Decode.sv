@@ -2,98 +2,123 @@
 `include "mycpu/mycpu.svh"
 
 module Decode (
+    input logic clk, resetn,
     input common_context_t CommonContext,
 
-    input decode_context_t DecodeContext,
+    input decode_context_t fetch2decode_1, fetch2decode_2,
+
+    input write_reg_t succeed_write_reg[5:0], 
+    input write_hilo_t succeed_write_hilo[5:0], 
     
-    output decode_context_t decodeContext,
-    output jmp_pack_t decodeJmp,
-    output logic jmp_delayed,
-
-    input execute_context_t executeContext, 
-    input memory_context_t memoryContext, 
-    input write_context_t WriteContext
+    output jmp_pack_t jmp_1, jmp_2,
+    output execute_context_t decode2execute_1, decode2execute_2,
+    
+    input pipeline_stat_t ExecuteStat_1, ExecuteStat_2,
+    output pipeline_stat_t DecodeStat_1, DecodeStat_2, 
+    input logic succeed_exception_valid,
+    output logic exception_valid, ERET_exist, MTC0_exist
 );
-
-op_t op;
-Decode_Op_Trans Decode_Op_Trans_Inst(.instr(DecodeContext.instr), .op(op));
-
-word_t vs;
-Decode_Forward_Reg Decode_Forward_Reg_Inst_s(
-    .e(executeContext.write_reg),
-    .m(memoryContext.write_reg),
-    .w(WriteContext.write_reg),
-    .src(DecodeContext.instr[25:21]), 
-    .data_src(CommonContext.r[DecodeContext.instr[25:21]]), 
-    .vr(vs)
-);
-
-word_t vt;
-Decode_Forward_Reg Decode_Forward_Reg_Inst_t(
-    .e(executeContext.write_reg),
-    .m(memoryContext.write_reg),
-    .w(WriteContext.write_reg),
-    .src(DecodeContext.instr[20:16]), 
-    .data_src(CommonContext.r[DecodeContext.instr[20:16]]), 
-    .vr(vt)
-);
-
-word_t vhi, vlo;
-Decode_Forward_HILO Decode_Forward_hilo_Inst(
-    .e(executeContext.write_hilo),
-    .m(memoryContext.write_hilo),
-    .w(WriteContext.write_hilo),
-    .data_hi(CommonContext.hi), 
-    .data_lo(CommonContext.lo), 
-    .vhi(vhi),
-    .vlo(vlo)
-);
-
-Decode_Select_Jmp Decode_Select_Jmp_Inst(.op(decodeContext.op), .pc_src(decodeContext.pc), .vars(decodeContext.vars), .jmp(decodeJmp), .*);
-
-memory_args_t memory_args;
-Decode_Memory Decode_Memory_Inst(.*);
-
-write_reg_t write_reg;
-Decode_Write_Reg Decode_Write_Reg_Inst(.cp0(CommonContext.cp0), .rt(DecodeContext.instr[20:16]), .rd(DecodeContext.instr[15:11]), .*);
-
-write_hilo_t write_hilo;
-Decode_Write_HILO Decode_Write_HILO_Inst(.*);
-
-always_comb begin
-    decodeContext = DecodeContext;
-    if (!DecodeContext.exception.valid) begin
-        decodeContext.stat = decodeContext.stat;
-        decodeContext.op = op;
+    
+    logic resetn_1;
+    
+    logic write_reg_valid_1, write_reg_valid_2;
+    creg_addr_t write_reg_dst_1, rs_1, rt_1;
+    creg_addr_t write_reg_dst_2, rs_2, rt_2;
+    
+    logic modify_hi_1, modify_lo_1, need_hi_1, need_lo_1;
+    logic modify_hi_2, modify_lo_2, need_hi_2, need_lo_2;
+    
+    logic MTC0_exist_1, MTC0_exist_2;
+    logic ERET_exist_1, ERET_exist_2;
+    logic exception_valid_1, exception_valid_2;
+    logic load_use_hazard_1, load_use_hazard_2, load_use_hazard_self;
+    
+    logic valid_1, valid_2;
+    
+    assign exception_valid = exception_valid_1 || exception_valid_2;
+    assign ERET_exist = ERET_exist_1 || ERET_exist_2;
+    assign MTC0_exist = MTC0_exist_1 || MTC0_exist_2; 
+    
+    Decode_single Decode_single_inst_1 (
+        .resetn(resetn && resetn_1),
+        .fetch2decode(fetch2decode_1),
+        .jmp(jmp_1),
+        .write_reg_valid(write_reg_valid_1),
+        .write_reg_dst(write_reg_dst_1),
+        .rs(rs_1), 
+        .rt(rt_1),
+        .modify_hi(modify_hi_1),
+        .modify_lo(modify_lo_1),
+        .need_hi(need_hi_1),
+        .need_lo(need_lo_1),
         
-        decodeContext.vars.va = {{27'b0}, DecodeContext.instr[10:6]};
-        decodeContext.vars.vi = {{16{DecodeContext.instr[15]}}, DecodeContext.instr[15:0]};
-        decodeContext.vars.viu = {{16'b0}, DecodeContext.instr[15:0]};
-        decodeContext.vars.vj = {DecodeContext.pc[31:28], DecodeContext.instr[25:0], 2'b0};
-        decodeContext.vars.vs = vs;
-        decodeContext.vars.vt = vt;
-        decodeContext.vars.hi = vhi;
-        decodeContext.vars.lo = vlo;
+        .exception_valid(exception_valid_1),
+        .MTC0_exist(MTC0_exist_1), 
+        .ERET_exist(ERET_exist_1),
+        .load_use_hazard(load_use_hazard_1),
         
-        decodeContext.vars.rs = DecodeContext.instr[25:21];
-        decodeContext.vars.rt = DecodeContext.instr[20:16];
-        decodeContext.vars.rd = DecodeContext.instr[15:11];
+        .DecodeStat(DecodeStat_1),
+        .decode2execute(decode2execute_1),
         
-        decodeContext.memory_args = memory_args;
-        decodeContext.write_hilo = write_hilo;
-        decodeContext.write_reg = write_reg;
-
-        unique case (decodeContext.op)
-            DECODE_ERROR: `THROW(decodeContext.exception, EX_RI, DecodeContext.pc)
-            SYSCALL: `THROW(decodeContext.exception, EX_SYS, DecodeContext.pc)
-            BREAK: `THROW(decodeContext.exception, EX_BP, DecodeContext.pc)
-            default: begin end
-        endcase
+        .valid(valid_1),
+        .*
+    );
+    
+    Decode_single Decode_single_inst_2 (
+        .fetch2decode(fetch2decode_2),
+        .jmp(jmp_2),
+        .write_reg_valid(write_reg_valid_2),
+        .write_reg_dst(write_reg_dst_2),
+        .rs(rs_2), 
+        .rt(rt_2),
+        .modify_hi(modify_hi_2),
+        .modify_lo(modify_lo_2),
+        .need_hi(need_hi_2),
+        .need_lo(need_lo_2),
+        
+        .exception_valid(exception_valid_2),
+        .MTC0_exist(MTC0_exist_2), 
+        .ERET_exist(ERET_exist_2),
+        .load_use_hazard(load_use_hazard_2),
+        
+        .DecodeStat(DecodeStat_2),
+        .decode2execute(decode2execute_2),
+        
+        .valid(valid_2),
+        .*
+    );
+    
+    assign load_use_hazard_self = valid_1 && valid_2 && (
+                                      (write_reg_valid_1 && 
+                                         (write_reg_dst_1 == rs_2 || 
+                                          write_reg_dst_1 == rt_2)
+                                       ) || 
+                                      (modify_hi_1 && need_hi_2) ||
+                                      (modify_lo_1 && need_lo_2)
+                                  );
+    
+    always_comb begin
+        DecodeStat_1 = 2'b11;
+        DecodeStat_2 = 2'b11;
+        resetn_1 = 1;
+        if (load_use_hazard_1) begin
+            DecodeStat_1.valid = 0;
+            DecodeStat_1.ready = 0;
+            DecodeStat_2.valid = 0;
+            DecodeStat_2.ready = 0;
+        end
+        
+        if (ExecuteStat_1.ready == 0 || ExecuteStat_2.ready == 0) begin
+            DecodeStat_1.ready = 0;
+            DecodeStat_2.ready = 0;
+        end
+        
+        if (load_use_hazard_2 || load_use_hazard_self) begin
+            resetn_1 = !(ExecuteStat_1.ready && DecodeStat_1.valid);
+            DecodeStat_2.valid = 0;
+            DecodeStat_2.ready = 0;
+        end
     end
-    else begin
-        decodeContext.stat = SD_IDLE;
-    end
-end
-
+    
 endmodule
 

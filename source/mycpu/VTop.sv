@@ -1,5 +1,6 @@
 `include "access.svh"
 `include "common.svh"
+`include "mycpu/mycpu.svh"
 
 module VTop (
     input logic clk, resetn,
@@ -11,8 +12,8 @@ module VTop (
 );
     `include "bus_decl"
 
-    ibus_req_t  ireq;
-    ibus_resp_t iresp;
+    flex_bus_req_t  ireq;
+    flex_bus_resp_t iresp;
     dbus_req_t  dreq;
     dbus_resp_t dresp;
     cbus_req_t  icreq,  dcreq;
@@ -24,20 +25,31 @@ module VTop (
     //DBusToCBus dcvt(.*);
     
     ICache icvt(.*);
+    
     dbus_req_t  [1:0] mux_dreq;
     dbus_resp_t [1:0] mux_dresp;
     cbus_req_t  [1:0] mux_creq;
     cbus_resp_t [1:0] mux_cresp;
-
+    
+    logic d_block;
+    
     always_comb begin
         mux_dreq = 0;
         mux_cresp = 0;
 
         if (dreq.addr[31:29] == 3'b101) begin
-            mux_dreq[1] = dreq;
-            dresp = mux_dresp[1];
-            dcreq = mux_creq[1];
-            mux_cresp[1] = dcresp;
+            if (!d_block) begin
+                mux_dreq[1] = dreq;
+                dresp = mux_dresp[1];
+                dcreq = mux_creq[1];
+                mux_cresp[1] = dcresp;
+            end
+            else begin
+                mux_dreq[0] = '0;
+                dresp = mux_dresp[0];
+                dcreq = mux_creq[0];
+                mux_cresp[0] = dcresp;
+            end
         end else begin
             mux_dreq[0] = dreq;
             dresp = mux_dresp[0];
@@ -45,12 +57,13 @@ module VTop (
             mux_cresp[0] = dcresp;
         end
     end
-
+    
     DCache dcvt0(
         .dreq(mux_dreq[0]),
         .dresp(mux_dresp[0]),
         .dcreq(mux_creq[0]),
         .dcresp(mux_cresp[0]),
+        .block(d_block),
         .*
     );
 

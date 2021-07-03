@@ -1,7 +1,7 @@
 `include "common.svh"
 `include "mycpu/mycpu.svh"
 
-module Decode_Op_Trans (
+module Fetch_op_trans (
     input word_t instr,
     output op_t op
 );
