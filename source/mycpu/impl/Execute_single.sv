@@ -55,7 +55,7 @@ module Execute_single (
     always_comb begin
         unique case (Op)
             MULTU, DIVU:  begin mult_a = vs; mult_b = vt; end
-            MULT, DIV: begin
+            MULT, DIV, MUL: begin
                 if (vs[31] == 1'b0) mult_a = vs; // a>=0
                 else mult_a = -$signed(vs);
                 if (vt[31] == 1'b0) mult_b = vt; // b>=0
@@ -103,8 +103,13 @@ module Execute_single (
                 if (mult_valid) begin
                     stat = SE_IDLE;
                     // {hi, lo} = a * b;
-                    write_hilo.hi = hi;
-                    write_hilo.lo = lo;
+                    if (Op == MUL) begin
+                        write_reg.value = lo;
+                    end
+                    else begin
+                        write_hilo.hi = hi;
+                        write_hilo.lo = lo;
+                    end
                 end
             end
             else if (Stat == SE_DIV) begin

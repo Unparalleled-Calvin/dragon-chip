@@ -82,6 +82,12 @@ module Fetch_Write_Reg (
             SB, SH, SW: begin
                 write_reg = '0;
             end
+            MUL: begin
+                write_reg.valid = 1;
+                write_reg.src = SRC_ALU;
+                write_reg.value = 32'h0;
+                write_reg.dst = rd;
+            end
             default: begin
                 write_reg = '0;
             end
