@@ -82,11 +82,11 @@ always_comb begin
                 op = DECODE_ERROR;
         end
         6'b011100: begin 
-            if (instr[5:0] == 6'b000010 && instr[15:11] == 5'b00000)
+            if (instr[5:0] == 6'b000010 && instr[10:6] == 5'b00000)
                 // if use MUL
-                op = MUL;
+                // op = MUL;
                 // if don't use MUL
-                // op = NOP;
+                op = NOP;
             else
                 op = DECODE_ERROR;
         end
