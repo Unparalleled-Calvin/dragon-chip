@@ -28,8 +28,8 @@ module DCache (
 //                               .s_resp(in_dresp[1]),
 //                               .*);
     //changed, 4 is the size of the cache set
-    ram_switch_t [cache_set_size * cache_line_size * 4 - 1: 0] ram_switch;
-    word_t       [cache_set_size * cache_line_size * 4 - 1: 0] ram_rdata;
+    ram_switch_t [cache_set_size * cacheline_words - 1: 0] ram_switch;
+    word_t       [cache_set_size * cacheline_words - 1: 0] ram_rdata;
 
     logic [1:0] uncached;
     assign uncached[0] = in_dreq[0].addr[31:29] == 3'b101;
@@ -38,7 +38,7 @@ module DCache (
 
     //use the lutram with 16 bytes, that is, 4 words
     generate
-        for (genvar i = 0; i < cache_set_size * cache_line_size * 4; i++) begin : LUTRAM_Initial
+        for (genvar i = 0; i < cache_set_size * cacheline_words; i++) begin : LUTRAM_Initial
             LUTRAM #(.NUM_BYTES(16)) ram_inst (
                 .clk(clk), .en(ram_switch[i].en),
                 .addr(ram_switch[i].offset),

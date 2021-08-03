@@ -7,8 +7,9 @@
 parameter int cache_set_len = 4;
 parameter int cache_line_len = 2;
 
-parameter int cache_set_size = 1 << cache_set_len;
-parameter int cache_line_size = 1 << cache_line_len;
+parameter int cache_set_size = 1 << cache_set_len; // how many sets
+parameter int cache_line_size = 1 << cache_line_len; //how many "lines"
+parameter int cacheline_words = 16; //how many lines
 
 typedef `BITS(32 - cache_set_len - 6) tag_t;
 typedef `BITS(cache_set_len) index_t;
