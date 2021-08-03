@@ -166,8 +166,6 @@ module DCache (
         comp_reqs[2][1] = offset[1] == busy_offset;
     end
 
-    
-    logic busy_req, busy_req_nxt;
     always_comb begin 
         cacheContext = CacheContext;
         in_dresp = '0;
@@ -467,83 +465,6 @@ module DCache (
                         cacheContext.busy_req = in_dreq[0];
                         cacheContext.req = in_dreq;
                         cacheContext.busy_req_index = 1'b0;
-                    end
-                    else if (cached[0] && (~cached[1])) begin
-                        `RW_CACHE(ram_switch, index[0], offset[0], in_dresp[0], in_dreq[0], target_position[0], strobe_i4[0], cacheContext, cacheContext.resp[0]);   
-
-                        in_dresp[1].data = '0;
-                        in_dresp[1].addr_ok = 1'b1; // 1
-                        in_dresp[1].data_ok = 0;
-                        cacheContext.resp[1].data = '0;
-                        cacheContext.resp[1].addr_ok = 1'b1;
-                        cacheContext.resp[1].data_ok = '0;
-                        cacheContext.offset = '0;
-                        if (cacheContext.cache_set_meta[index[1]].cache_line_meta[flush_position[1]].dirty) begin
-                            cacheContext.stat = SC_FLUSH;
-                        end
-                        else begin
-                            cacheContext.stat = SC_FETCH;
-                        end
-                        cacheContext.busy_req = in_dreq[1];
-                        cacheContext.req = in_dreq;
-                        cacheContext.busy_req_index = 1'b1;
-                    end
-                    //命中第二个 
-                    else if (~cached[0] && cached[1]) begin
-                        if (index[0] != index[1] || comp_reqs[0] == 2'b00 || comp_reqs[0] == 2'b10) begin
-                            `RW_CACHE(ram_switch, index[1], offset[1], in_dresp[1], in_dreq[1], target_position[1], strobe_i4[1], cacheContext, cacheContext.resp[1]);   
-                            in_dresp[0].data = '0;
-                            in_dresp[0].addr_ok = 1'b1; // 1
-                            in_dresp[0].data_ok = 0;
-                            cacheContext.resp[0].data = '0;
-                            cacheContext.resp[0].addr_ok = 1'b1;
-                            cacheContext.resp[0].data_ok = '0;
-                            cacheContext.offset = '0;
-                        end
-                        else begin
-                            for (int i = 0; i < 2; i++) begin
-                                in_dresp[i].data = '0;
-                                in_dresp[i].addr_ok = 1'b1; // 1
-                                in_dresp[i].data_ok = 0;
-                                cacheContext.resp[i].data = '0;
-                                cacheContext.resp[i].addr_ok = 1'b1;
-                                cacheContext.resp[i].data_ok = '0;
-                                cacheContext.offset = '0;
-                            end
-                            
-                        end
-
-                        
-                        if (cacheContext.cache_set_meta[index[0]].cache_line_meta[flush_position[0]].dirty) begin
-                            cacheContext.stat = SC_FLUSH;
-                        end
-                        else begin
-                            cacheContext.stat = SC_FETCH;
-                        end
-                        cacheContext.busy_req = in_dreq[0];
-                        cacheContext.req = in_dreq;
-                        cacheContext.busy_req_index = 1'b1;
-                    end
-                    
-                    else begin
-                        for (int i = 0; i < 2; i++) begin
-                            in_dresp[i].data = '0;
-                            in_dresp[i].addr_ok = 1'b1; // 1
-                            in_dresp[i].data_ok = 0;
-                            cacheContext.resp[i].data = '0;
-                            cacheContext.resp[i].addr_ok = 1'b1;
-                            cacheContext.resp[i].data_ok = '0;
-                            cacheContext.offset = '0;
-                        end
-                        if (cacheContext.cache_set_meta[index[0]].cache_line_meta[flush_position[0]].dirty) begin
-                            cacheContext.stat = SC_FLUSH;
-                        end
-                        else begin
-                            cacheContext.stat = SC_FETCH;
-                        end
-                        cacheContext.busy_req = in_dreq[0];
-                        cacheContext.req = in_dreq;
-                        cacheContext.busy_req_index = 1'b1;
                     end
                 end 
             end
