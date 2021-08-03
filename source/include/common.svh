@@ -139,7 +139,6 @@ typedef struct packed {
     msize_t  size;    // number of bytes
     strobe_t strobe;  // which bytes are enabled? set to zeros for read request
     word_t   data;    // the data to write
-    logic first; // is it previous to the other req?
 } dbus_req_t;
 
 typedef struct packed {

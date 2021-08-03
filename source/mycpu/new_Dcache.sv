@@ -1,7 +1,7 @@
 `include "common.svh"
 `include "mycpu/mycpu.svh"
 
-module DCache (
+module new_DCache (
     input logic clk, resetn,
     
     input  dbus_req_t [1:0] dreq,
