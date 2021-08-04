@@ -1,6 +1,7 @@
 `include "common.svh"
 `include "mycpu/mycpu.svh"
 
+// 8.4 14:00
 module DCache (
     input logic clk, resetn,
     
@@ -97,7 +98,12 @@ module DCache (
     always_comb begin
         
         for (int i = 0; i < 2; i++) begin
-            target_cache_set_meta = CacheContext.cache_set_meta[index[i]];
+            for (int x = 0; x < cache_set_size; x++) begin
+                if (x[3:0] == index[i]) begin
+                    target_cache_set_meta = CacheContext.cache_set_meta[x];
+                end
+            end
+            
             unique if (target_cache_set_meta.cache_line_meta[0].valid && target_cache_set_meta.cache_line_meta[0].tag == tag[i]) begin
                 cached[i] = 1;
                 target_position[i] = 0;
@@ -132,15 +138,28 @@ module DCache (
         flush_addr            = '0;
         if (CacheContext.stat == SC_IDLE) begin
             for (int i = 0; i < 2; i++) begin
-                flush_position[i] = CacheContext.cache_set_meta[index[i]].flush_position;
+                for (int x = 0; x < cache_set_size; x++) begin
+                    if (x[3:0] == index[i]) begin
+                        flush_position[i] = CacheContext.cache_set_meta[x].flush_position;
+                    end
+                end
+                
             end
         end
         else begin
             for (int i = 0; i < 3; i++) begin
-                flush_position[i] = CacheContext.cache_set_meta[index[i]].flush_position;
-                flush_cache_line_meta = CacheContext.cache_set_meta[index[i]].cache_line_meta[flush_position[i]];
-                flush_tag             = flush_cache_line_meta.tag;
-                flush_addr            = {flush_tag, index[i], 6'b0};
+                for (int x = 0; x < cache_set_size; x++) begin
+                    for (int y = 0; y < cache_line_size; y++) begin
+                        if (x[3:0] == index[i] && y[1:0] == flush_position[i]) begin
+                            flush_position[i] = CacheContext.cache_set_meta[x].flush_position;
+                            flush_cache_line_meta = CacheContext.cache_set_meta[x].cache_line_meta[y];
+                            flush_tag             = flush_cache_line_meta.tag;
+                            flush_addr            = {flush_tag, x[3:0], 6'b0};
+                        end
+                    end
+                    
+                end
+                
             end
             
         end
@@ -200,21 +219,28 @@ module DCache (
                         in_dresp[0].addr_ok = 1'b1; // 1
                         in_dresp[0].data_ok = 0;
                         cacheContext.offset = '0;
-                        if (cacheContext.cache_set_meta[index[0]].cache_line_meta[flush_position[0]].dirty) begin
-                            if (write_en[0] == 1'b1) begin
-                                cacheContext.stat = SC_FLUSH_IDLE; 
+                        for (int x = 0; x < cache_set_size; x++) begin
+                            for (int y = 0; y < cache_line_size; y++) begin
+                                if (x[3:0] == index[0] && y[1:0] == flush_position[0]) begin
+                                    if (cacheContext.cache_set_meta[x].cache_line_meta[y].dirty) begin
+                                        if (write_en[0] == 1'b1) begin
+                                            cacheContext.stat = SC_FLUSH_IDLE; 
+                                        end
+                                        else 
+                                            cacheContext.stat = SC_FLUSH;
+                                    end
+                                    else begin
+                                        if (write_en[0] == 1'b1) begin
+                                            cacheContext.stat = SC_FETCH_IDLE;
+                                        end
+                                        else begin
+                                            cacheContext.stat = SC_FETCH;
+                                        end
+                                    end
+                                end
                             end
-                            else 
-                                cacheContext.stat = SC_FLUSH;
                         end
-                        else begin
-                            if (write_en[0] == 1'b1) begin
-                                cacheContext.stat = SC_FETCH_IDLE;
-                            end
-                            else begin
-                                cacheContext.stat = SC_FETCH;
-                            end
-                        end
+                        
                         cacheContext.busy_req = in_dreq[0];
                         cacheContext.req = in_dreq;
                         cacheContext.busy_req_index = 1'b0;
@@ -229,7 +255,11 @@ module DCache (
                     end
                     else if (cached[1]) begin
                         `RW_CACHE(1'b1); 
-                        ram_switch[{index[1], offset[1]}].offset = target_position[1];
+                        for (int m = 0; m < cache_set_size * cacheline_words; m++) begin
+                            if (m[7:0] == {index[1], offset[1]}) 
+                                ram_switch[m].offset = target_position[1];
+                        end
+                        
                         cacheContext.stat = SC_IDLE;
                     end
                     else begin
@@ -237,22 +267,29 @@ module DCache (
                         in_dresp[1].addr_ok = 1'b1; // 1
                         in_dresp[1].data_ok = 0;
                         cacheContext.offset = '0;
-                        if (cacheContext.cache_set_meta[index[1]].cache_line_meta[flush_position[1]].dirty) begin
-                            if (write_en[1] == 1'b1) begin
-                                cacheContext.stat = SC_FLUSH_IDLE;
-                            end
-                            else begin
-                                cacheContext.stat = SC_FLUSH;
+                        for (int x = 0; x < cache_set_size; x++) begin
+                            for (int y = 0; y < cache_line_size; y++) begin
+                                if (x[3:0] == index[1] && y[1:0] == flush_position[1]) begin
+                                    if (cacheContext.cache_set_meta[x].cache_line_meta[y].dirty) begin
+                                        if (write_en[1] == 1'b1) begin
+                                            cacheContext.stat = SC_FLUSH_IDLE;
+                                        end
+                                        else begin
+                                            cacheContext.stat = SC_FLUSH;
+                                        end
+                                    end
+                                    else begin
+                                        if (write_en[1] == 1'b1) begin
+                                            cacheContext.stat = SC_FETCH_IDLE;
+                                        end
+                                        else begin
+                                            cacheContext.stat = SC_FETCH;
+                                        end
+                                    end 
+                                end
                             end
                         end
-                        else begin
-                            if (write_en[1] == 1'b1) begin
-                                cacheContext.stat = SC_FETCH_IDLE;
-                            end
-                            else begin
-                                cacheContext.stat = SC_FETCH;
-                            end
-                        end 
+                        
                         cacheContext.busy_req = in_dreq[1];
                         cacheContext.req = in_dreq;
                         cacheContext.busy_req_index = 1'b1;
@@ -304,18 +341,27 @@ module DCache (
                                         `RW_CACHE(1'b0);  
                                         for (int j = 0; j < 4; j++) begin
                                             if (strobe_i4[1][j] == 1'b1) begin
-                                                ram_switch[{index[1], offset[1]}].wdata[(((j + 1) << 3) - 1)-:8] = in_dreq[1].data[(((j + 1) << 3) - 1)-:8];
+                                                for (int m = 0; m < cache_set_size * cacheline_words; m++) begin
+                                                    if (m[7:0] == {index[1], offset[1]})
+                                                        ram_switch[m].wdata[(((j + 1) << 3) - 1)-:8] = in_dreq[1].data[(((j + 1) << 3) - 1)-:8];
+                                                end 
                                             end
                                         end
-                                      
-                                        ram_switch[{index[0], offset[0]}].strobe = (strobe_i4[0] | strobe_i4[1]);
+                                        for (int m = 0; m < cache_set_size * cacheline_words; m++) begin
+                                            if (m[7:0] == {index[0], offset[0]})
+                                                ram_switch[m].strobe = (strobe_i4[0] | strobe_i4[1]);
+                                        end
                                         cacheContext.stat = SC_IDLE;
                                         
                                     end
                                     else if ((write_en[0] == 1'b1)) begin
                                         // if the reqs manipulate the same position, then do parallelly
                                             `RW_CACHE(1'b0);
-                                            in_dresp[1].data = ram_rdata[{index[1], offset[1]}];
+                                            for (int m = 0; m < cache_set_size * cacheline_words; m++) begin
+                                                if (m[7:0] == {index[1], offset[1]})
+                                                    in_dresp[1].data = ram_rdata[m];
+                                            end
+                                            
                                             
                                             for (int j = 0; j < 4; j++) begin
                                                 if (strobe_i4[0][j] == 1'b1) begin
@@ -358,21 +404,25 @@ module DCache (
                         
                         
                         cacheContext.offset = '0;
-                        if (cacheContext.cache_set_meta[index[1]].cache_line_meta[flush_position[1]].dirty) begin
-                            if (write_en[1] == 1'b1) begin
-                                cacheContext.stat = SC_FLUSH_IDLE;
-                                
+                        for (int x = 0; x < cache_set_size; x++) begin
+                            for (int y = 0; y < cache_line_size; y++) begin
+                                if (x[3:0] == index[1] && y[1:0] == flush_position[1]) begin
+                                    if (cacheContext.cache_set_meta[x].cache_line_meta[y].dirty) begin
+                                        if (write_en[1] == 1'b1) begin
+                                            cacheContext.stat = SC_FLUSH_IDLE;
+                                        end
+                                        else
+                                            cacheContext.stat = SC_FLUSH;
+                                    end
+                                    else begin
+                                        if (write_en[1] == 1'b1) begin
+                                            cacheContext.stat = SC_FETCH_IDLE;
+                                        end
+                                        else
+                                            cacheContext.stat = SC_FETCH;
+                                    end
+                                end
                             end
-                            else
-                                cacheContext.stat = SC_FLUSH;
-                        end
-                        else begin
-                            if (write_en[1] == 1'b1) begin
-                                cacheContext.stat = SC_FETCH_IDLE;
-                                
-                            end
-                            else
-                                cacheContext.stat = SC_FETCH;
                         end
                         cacheContext.busy_req = in_dreq[1];
                         cacheContext.req = in_dreq;
@@ -389,22 +439,28 @@ module DCache (
                             
                             
                             cacheContext.offset = '0;
-                            if (cacheContext.cache_set_meta[index[0]].cache_line_meta[flush_position[0]].dirty) begin
-                            if (write_en[0] == 1'b1) begin
-                                cacheContext.stat = SC_FLUSH_IDLE;
-                                
-                            end
-                            else
-                                cacheContext.stat = SC_FLUSH;
-                            end
-                            else begin
-                                if (write_en[0] == 1'b1) begin
-                                    cacheContext.stat = SC_FETCH_IDLE;
-                                    
+                            for (int x = 0; x < cache_set_size; x++) begin
+                            for (int y = 0; y < cache_line_size; y++) begin
+                                if (x[3:0] == index[0] && y[1:0] == flush_position[0]) begin
+                                    if (cacheContext.cache_set_meta[x].cache_line_meta[y].dirty) begin
+                                        if (write_en[0] == 1'b1) begin
+                                            cacheContext.stat = SC_FLUSH_IDLE;
+                                        end
+                                        else
+                                            cacheContext.stat = SC_FLUSH;
+                                    end
+                                    else begin
+                                        if (write_en[0] == 1'b1) begin
+                                            cacheContext.stat = SC_FETCH_IDLE;
+                                            
+                                        end
+                                        else
+                                            cacheContext.stat = SC_FETCH;
+                                    end
                                 end
-                                else
-                                    cacheContext.stat = SC_FETCH;
                             end
+                        end
+                            
                         end
                         else begin
                             for (int i = 0; i < 2; i++) begin
@@ -416,12 +472,19 @@ module DCache (
                                 
                                 cacheContext.offset = '0;
                             end
-                            if (cacheContext.cache_set_meta[index[0]].cache_line_meta[flush_position[0]].dirty) begin
-                                cacheContext.stat = SC_FLUSH;
+                            for (int x = 0; x < cache_set_size; x++) begin
+                                for (int y = 0; y < cache_line_size; y++) begin
+                                    if (x[3:0] == index[0] && y[1:0] == flush_position[0]) begin
+                                        if (cacheContext.cache_set_meta[x].cache_line_meta[y].dirty) begin
+                                            cacheContext.stat = SC_FLUSH;
+                                        end
+                                        else begin
+                                            cacheContext.stat = SC_FETCH;
+                                        end
+                                    end
+                                end
                             end
-                            else begin
-                                cacheContext.stat = SC_FETCH;
-                            end
+                            
                         end
              
                         cacheContext.busy_req = in_dreq[0];
@@ -439,12 +502,19 @@ module DCache (
                             
                             cacheContext.offset = '0;
                         end
-                        if (cacheContext.cache_set_meta[index[0]].cache_line_meta[flush_position[0]].dirty) begin
-                            cacheContext.stat = SC_FLUSH;
+                        for (int x = 0; x < cache_set_size; x++) begin
+                            for (int y = 0; y < cache_line_size; y++) begin
+                                if (x[3:0] == index[0] && y[1:0] == flush_position[0]) begin
+                                    if (cacheContext.cache_set_meta[x].cache_line_meta[y].dirty) begin
+                                        cacheContext.stat = SC_FLUSH;
+                                    end
+                                    else begin
+                                        cacheContext.stat = SC_FETCH;
+                                    end
+                                end
+                            end
                         end
-                        else begin
-                            cacheContext.stat = SC_FETCH;
-                        end
+                        
                         cacheContext.busy_req = in_dreq[0];
                         cacheContext.req = in_dreq;
                         cacheContext.busy_req_index = 1'b0;
@@ -493,22 +563,27 @@ module DCache (
                                     
                                     
                                     cacheContext.offset = '0;
-                                    if (cacheContext.cache_set_meta[index[1 - q]].cache_line_meta[flush_position[1 - q]].dirty) begin
-                                        if (write_en[1 - q] == 1'b1) begin
-                                            cacheContext.stat = SC_FLUSH_IDLE;
-                                            
+                                    for (int x = 0; x < cache_set_size; x++) begin
+                                        for (int y = 0; y < cache_line_size; y++) begin
+                                            if (x[3:0] == index[1 - q] && y[1:0] == flush_position[1 - q]) begin
+                                                if (cacheContext.cache_set_meta[x].cache_line_meta[y].dirty) begin
+                                                    if (write_en[1 - q] == 1'b1) begin
+                                                        cacheContext.stat = SC_FLUSH_IDLE;
+                                                    end
+                                                    else
+                                                        cacheContext.stat = SC_FLUSH;
+                                                end
+                                                else begin
+                                                    if (write_en[1 - q] == 1'b1) begin
+                                                        cacheContext.stat = SC_FETCH_IDLE;
+                                                    end
+                                                    else
+                                                        cacheContext.stat = SC_FETCH;
+                                                end
+                                            end
                                         end
-                                        else
-                                            cacheContext.stat = SC_FLUSH;
                                     end
-                                    else begin
-                                        if (write_en[1 - q] == 1'b1) begin
-                                            cacheContext.stat = SC_FETCH_IDLE;
-                                            
-                                        end
-                                        else
-                                            cacheContext.stat = SC_FETCH;
-                                    end
+                                    
                                     cacheContext.busy_req = in_dreq[1 - q];
                                     cacheContext.req = in_dreq;
                                     cacheContext.busy_req_index = non_busy_req_index;
@@ -539,15 +614,26 @@ module DCache (
             
                 
                 if (dcresp.ready) begin
-                    ram_switch[{index[2], busy_offset}].en = 1;
-               
-                    ram_switch[{index[2], busy_offset}].offset = flush_position[2];
-                    ram_switch[{index[2], busy_offset}].strobe = 4'b1111;
-                    ram_switch[{index[2], busy_offset}].wdata = dcresp.data;
+                    for (int m = 0; m < cache_set_size * cacheline_words; m++) begin
+                        if (m[7:0] == {index[2], busy_offset}) begin
+                            ram_switch[m].en = 1;
+                            ram_switch[m].offset = flush_position[2];
+                            ram_switch[m].strobe = 4'b1111;
+                            ram_switch[m].wdata = dcresp.data;
+                        end
+                    end
+                    
                     if (busy_offset == 4'b0) begin
-                        cacheContext.cache_set_meta[index[2]].cache_line_meta[flush_position[2]].tag =  tag[2];
-                        cacheContext.cache_set_meta[index[2]].cache_line_meta[flush_position[2]].dirty = 0;
-                        cacheContext.cache_set_meta[index[2]].cache_line_meta[flush_position[2]].valid = 1;
+                        for (int x = 0; x < cache_set_size; x++) begin
+                            for (int y = 0; y < cache_line_size; y++) begin
+                                if (x[3:0] == index[2] && y[1:0] == flush_position[2]) begin
+                                    cacheContext.cache_set_meta[x].cache_line_meta[y].tag =  tag[2];
+                                    cacheContext.cache_set_meta[x].cache_line_meta[y].dirty = 0;
+                                    cacheContext.cache_set_meta[x].cache_line_meta[y].valid = 1;
+                                end
+                            end
+                        end
+                        
                     end
                     //
                     if (busy_offset == offset[2]) begin
@@ -559,15 +645,24 @@ module DCache (
                                 if (|strobe_i4[2]) begin
                                     for (int i = 0; i < 4; i++) begin
                                         if (strobe_i4[2][i] == 1'b1) begin
-                                            ram_switch[{index[2], busy_offset}].wdata[(((i + 1) << 3) - 1)-:8] = CacheContext.busy_req.data[(((i + 1) << 3) - 1)-:8];
+                                            for (int m = 0; m < cache_set_size * cacheline_words; m++) begin
+                                                if (m[7:0] == {index[2], busy_offset})
+                                                    ram_switch[m].wdata[(((i + 1) << 3) - 1)-:8] = CacheContext.busy_req.data[(((i + 1) << 3) - 1)-:8];
+                                            end
+                                                
                                         end
                                     end
-                                
-                                    cacheContext.cache_set_meta[index[2]].cache_line_meta[flush_position[2]].dirty = 1;
+                                    for (int x = 0; x < cache_set_size; x++) begin
+                                        for (int y = 0; y < cache_line_size; y++) begin
+                                            if (x[3:0] == index[2] && y[1:0] == flush_position[2]) begin
+                                                cacheContext.cache_set_meta[x].cache_line_meta[y].dirty = 1;
+                                            end
+                                        end
+                                    end
                                 end
-                                else begin
-                                    ram_switch[{index[2], busy_offset}].wdata = dcresp.data;
-                                end
+                                // else begin
+                                //     ram_switch[{index[2], busy_offset}].wdata = dcresp.data;
+                                // end
                                 if (CacheContext.req[1 - q].valid == 1'b1) 
                                     cacheContext.stat = SC_FETCH_SEC;
                                 else 
@@ -584,20 +679,27 @@ module DCache (
                                         cacheContext.stat = SC_IDLE;
                                     end
                                     else begin
-                                        if (cacheContext.cache_set_meta[index[q]].cache_line_meta[flush_position[q]].dirty) begin
-                                        if (write_en[q] == 1'b1) begin
-                                            cacheContext.stat = SC_FLUSH_IDLE;
-                                        end
-                                        else
-                                            cacheContext.stat = SC_FLUSH;
-                                        end
-                                        else begin
-                                            if (write_en[q] == 1'b1) begin
-                                                cacheContext.stat = SC_FETCH_IDLE;
+                                        for (int x = 0; x < cache_set_size; x++) begin
+                                            for (int y = 0; y < cache_line_size; y++) begin
+                                                if (x[3:0] == index[q] && y[1:0] == flush_position[q]) begin
+                                                    if (cacheContext.cache_set_meta[x].cache_line_meta[y].dirty) begin
+                                                        if (write_en[q] == 1'b1) begin
+                                                            cacheContext.stat = SC_FLUSH_IDLE;
+                                                        end
+                                                        else
+                                                            cacheContext.stat = SC_FLUSH;
+                                                        end
+                                                    else begin
+                                                        if (write_en[q] == 1'b1) begin
+                                                            cacheContext.stat = SC_FETCH_IDLE;
+                                                        end
+                                                        else 
+                                                            cacheContext.stat = SC_FETCH;
+                                                    end
+                                                end
                                             end
-                                            else 
-                                                cacheContext.stat = SC_FETCH;
                                         end
+                                        
                                         cacheContext.busy_req = in_dreq[q];
                                         cacheContext.req = in_dreq;
                                         cacheContext.busy_req_index = non_busy_req_index;
@@ -610,7 +712,12 @@ module DCache (
                             end
                         end
                         cacheContext.offset = '0;
-                        cacheContext.cache_set_meta[index[2]].flush_position = CacheContext.cache_set_meta[index[2]].flush_position + 1;
+                        for (int x = 0; x < cache_set_size; x++) begin
+                            if (x[3:0] == index[2]) begin
+                                cacheContext.cache_set_meta[x].flush_position = CacheContext.cache_set_meta[x].flush_position + 1;
+                            end
+                        end
+                        
                     end
                     else begin
                         cacheContext.offset = CacheContext.offset + 1;
@@ -628,11 +735,15 @@ module DCache (
                 cacheContext.stat = SC_FETCH_SEC;
       
                 if (dcresp.ready) begin
-                    ram_switch[{index[2], busy_offset}].en = 1;
-                    //这里flush_postion用1、0都行
-                    ram_switch[{index[2], busy_offset}].offset = flush_position[2];
-                    ram_switch[{index[2], busy_offset}].strobe = 4'b1111;
-                    ram_switch[{index[2], busy_offset}].wdata = dcresp.data;
+                    for (int m = 0; m < cache_set_size * cacheline_words; m++) begin
+                        if (m[7:0] == {index[2], busy_offset}) begin
+                            ram_switch[m].en = 1;
+                            ram_switch[m].offset = flush_position[2];
+                            ram_switch[m].strobe = 4'b1111;
+                            ram_switch[m].wdata = dcresp.data;
+                        end
+                    end
+                    
                     for (int q = 0; q < 2; q++) begin
                         if (q[0] == non_busy_req_index) begin
                             if (cached[q] == 1'b1) begin
@@ -647,15 +758,26 @@ module DCache (
                                         if (|strobe_i4[q]) begin
                                             for (int i = 0; i < 4; i++) begin
                                                 if (strobe_i4[q][i] == 1'b1) begin
-                                                    ram_switch[{index[q], busy_offset}].wdata[(((i + 1) << 3) - 1)-:8] = in_dreq[q].data[(((i + 1) << 3) - 1)-:8];
+                                                    for (int m = 0; m < cache_set_size * cacheline_words; m++) begin
+                                                        if (m[7:0] == {index[q], busy_offset}) begin
+                                                            ram_switch[m].wdata[(((i + 1) << 3) - 1)-:8] = in_dreq[q].data[(((i + 1) << 3) - 1)-:8];
+                                                        end
+                                                    end
+                                                    
                                                 end
                                             end
-                                        
-                                            cacheContext.cache_set_meta[index[q]].cache_line_meta[target_position[q]].dirty = 1;
+                                            for (int x = 0; x < cache_set_size; x++) begin
+                                                for (int y = 0; y < cache_line_size; y++) begin
+                                                    if (x[3:0] == index[q] && y[1:0] == target_position[q]) begin
+                                                        cacheContext.cache_set_meta[x].cache_line_meta[y].dirty = 1;
+                                                    end
+                                                end
+                                            end
+                                            
                                         end
-                                        else begin
-                                            ram_switch[{index[q], offset[q]}].wdata = dcresp.data;
-                                        end
+                                        // else begin
+                                        //     ram_switch[{index[q], offset[q]}].wdata = dcresp.data;
+                                        // end
                                     end
                                     else  begin
                                         for (int i = 0; i < 2; i++) begin
@@ -680,29 +802,39 @@ module DCache (
                     if (CacheContext.offset == 4'hf) begin // !dcresp.last
                         cacheContext.stat = SC_IDLE;
                         cacheContext.offset = '0;
-                        // cacheContext.cache_set_meta[index[2]].cache_line_meta[flush_position[2]].tag = tag[2];
-                        cacheContext.cache_set_meta[index[2]].cache_line_meta[flush_position[2]].valid = 1;
-                        // cacheContext.cache_set_meta[index[2]].cache_line_meta[flush_position[2]].dirty = 0;
-                        cacheContext.cache_set_meta[index[2]].flush_position = CacheContext.cache_set_meta[index[2]].flush_position + 1;
+                        for (int x = 0; x < cache_set_size; x++) begin
+                            for (int y = 0; y < cache_line_size; y++) begin
+                                if (x[3:0] == index[2] && y[1:0] == flush_position[2]) begin
+                                    cacheContext.cache_set_meta[x].cache_line_meta[y].valid = 1;
+                                    cacheContext.cache_set_meta[x].flush_position = CacheContext.cache_set_meta[y].flush_position + 1;
+                                end
+                            end
+                        end
+                        
                         for (int q = 0; q < 2; q++) begin
                             if (q[0] == non_busy_req_index) begin
                                 if (CacheContext.req[q].valid == 1'b1 && cached[q] == 1'b0) begin
-                                    if (cacheContext.cache_set_meta[index[q]].cache_line_meta[flush_position[q]].dirty) begin
-                                        if (write_en[q] == 1'b1) begin
-                                            cacheContext.stat = SC_FLUSH_IDLE;
-                                            
+                                    for (int x = 0; x < cache_set_size; x++) begin
+                                        for (int y = 0; y < cache_line_size; y++) begin
+                                            if (x[3:0] == index[q] && y[1:0] == flush_position[q]) begin
+                                                if (cacheContext.cache_set_meta[x].cache_line_meta[y].dirty) begin
+                                                    if (write_en[q] == 1'b1) begin
+                                                        cacheContext.stat = SC_FLUSH_IDLE;
+                                                    end
+                                                    else 
+                                                        cacheContext.stat = SC_FLUSH;
+                                                end
+                                                else begin
+                                                    if (write_en[q] == 1'b1) begin
+                                                        cacheContext.stat = SC_FETCH_IDLE;
+                                                    end
+                                                    else 
+                                                        cacheContext.stat = SC_FETCH;
+                                                end
+                                            end
                                         end
-                                        else 
-                                            cacheContext.stat = SC_FLUSH;
                                     end
-                                    else begin
-                                        if (write_en[q] == 1'b1) begin
-                                            cacheContext.stat = SC_FETCH_IDLE;
-                                            
-                                        end
-                                        else 
-                                            cacheContext.stat = SC_FETCH;
-                                    end
+                                    
                                     cacheContext.busy_req = in_dreq[q];
                                     cacheContext.req = in_dreq;
                                     cacheContext.busy_req_index = non_busy_req_index;
@@ -718,17 +850,23 @@ module DCache (
                 end
             end
             SC_FLUSH_IDLE: begin
-                ram_switch[{index[2], busy_offset}].en = 1;
-                ram_switch[{index[2], busy_offset}].offset = flush_position[2];
-                ram_switch[{index[2], busy_offset}].strobe = '0;
-                ram_switch[{index[2], busy_offset}].wdata = '0;
+                for (int m = 0; m < cache_set_size * cacheline_words; m++) begin
+                    if (m[7:0] == {index[2], busy_offset}) begin
+                        ram_switch[m].en = 1;
+                        ram_switch[m].offset = flush_position[2];
+                        ram_switch[m].strobe = '0;
+                        ram_switch[m].wdata = '0;
+                        
+                    end
+                end
                 
+                dcreq.data = ram_rdata[{index[2], busy_offset}];
                 dcreq.valid = 1;
                 dcreq.is_write = 1;
                 dcreq.size = MSIZE4;
                 dcreq.addr = flush_addr;
                 dcreq.strobe = 4'b1111;
-                dcreq.data = ram_rdata[{index[2], busy_offset}];
+                
                 dcreq.len = MLEN16;
                 cacheContext.stat = SC_FLUSH_IDLE;
                 if (dcresp.ready) begin
@@ -895,23 +1033,47 @@ module DCache (
                 cacheContext.stat = SC_FETCH_IDLE;
            
                 if (dcresp.ready) begin
-                    ram_switch[{index[2], busy_offset}].en = 1;
-                    ram_switch[{index[2], busy_offset}].offset = flush_position[2];
-                    ram_switch[{index[2], busy_offset}].strobe = 4'b1111;
-                    ram_switch[{index[2], busy_offset}].wdata = dcresp.data;
+                    for (int m = 0; m < cache_set_size * cacheline_words; m++) begin
+                        if (m[7:0] == {index[2], busy_offset}) begin
+                            ram_switch[m].en = 1;
+                            ram_switch[m].offset = flush_position[2];
+                            ram_switch[m].strobe = 4'b1111;
+                            ram_switch[m].wdata = dcresp.data;
+                        end
+                    end
+                    
                     if (busy_offset == 4'b0) begin
-                        cacheContext.cache_set_meta[index[2]].cache_line_meta[flush_position[2]].tag =  tag[2];
-                        cacheContext.cache_set_meta[index[2]].cache_line_meta[flush_position[2]].dirty = 0;
-                        cacheContext.cache_set_meta[index[2]].cache_line_meta[flush_position[2]].valid = 1;
+                        for (int x = 0; x < cache_set_size; x++) begin
+                            for (int y = 0; y < cache_line_size; y++) begin
+                                if (x[3:0] == index[2] && y[1:0] == flush_position[2]) begin
+                                    cacheContext.cache_set_meta[x].cache_line_meta[y].tag = tag[2];
+                                    cacheContext.cache_set_meta[x].cache_line_meta[y].dirty = 0;
+                                    cacheContext.cache_set_meta[x].cache_line_meta[y].valid = 1;
+                                end
+                            end
+                        end
+
+                        
                     end
                     if (busy_offset == offset[2] && (|strobe_i4[2])) begin
                         for (int i = 0; i < 4; i++) begin
                             if (strobe_i4[2][i] == 1'b1) begin
-                                ram_switch[{index[2], busy_offset}].wdata[(((i + 1) << 3) - 1)-:8] = CacheContext.busy_req.data[(((i + 1) << 3) - 1)-:8];
+                                for (int m = 0; m < cache_set_size * cacheline_words; m++) begin
+                                    if (m[7:0] == {index[2], busy_offset}) begin
+                                        ram_switch[m].wdata[(((i + 1) << 3) - 1)-:8] = CacheContext.busy_req.data[(((i + 1) << 3) - 1)-:8];
+                                    end
+                                end
+                                
                             end
                         end
-                   
-                        cacheContext.cache_set_meta[index[2]].cache_line_meta[flush_position[2]].dirty = 1;
+                        for (int x = 0; x < cache_set_size; x++) begin
+                            for (int y = 0; y < cache_line_size; y++) begin
+                                if (x[3:0] == index[2] && y[1:0] == flush_position[2]) begin
+                                    cacheContext.cache_set_meta[x].cache_line_meta[y].dirty = 1;
+                                end
+                            end
+                        end
+                        
                     end
                    
                     //to do 把strobe因素加进去
@@ -924,11 +1086,15 @@ module DCache (
                             unique case (comp_reqs[1])
                                 2'b00: begin
                                    `RW_CACHE(1'b0);
-                                   
                                 end
                                 2'b01, 2'b11: begin
-                                    ram_switch[{index[0], offset[0]}].en = 1;
-                                    ram_switch[{index[0], offset[0]}].offset = target_position[0];
+                                    for (int m = 0; m < cache_set_size * cacheline_words; m++) begin
+                                        if (m[7:0] == {index[0], offset[0]}) begin
+                                            ram_switch[m].en = 1;
+                                            ram_switch[m].offset = target_position[0];
+                                        end
+                                    end
+                                    
                                     
                                     if (busy_offset == offset[0]) begin
                                         in_dresp[0].data_ok = 1'b1;
@@ -936,10 +1102,21 @@ module DCache (
                                         if (|strobe_i4[0]) begin
                                             for (int i = 0; i < 4; i++) begin
                                                 if (strobe_i4[0][i] == 1'b1) begin
-                                                    ram_switch[{index[0], busy_offset}].wdata[(((i + 1) << 3) - 1)-:8] = in_dreq[0].data[(((i + 1) << 3) - 1)-:8];
+                                                    for (int m = 0; m < cache_set_size * cacheline_words; m++) begin
+                                                        if (m[7:0] == {index[0], busy_offset}) begin
+                                                            ram_switch[m].wdata[(((i + 1) << 3) - 1)-:8] = in_dreq[0].data[(((i + 1) << 3) - 1)-:8];
+                                                        end
+                                                    end
                                                 end
                                             end
-                                            cacheContext.cache_set_meta[index[0]].cache_line_meta[target_position[0]].dirty = 1;
+                                            for (int x = 0; x < cache_set_size; x++) begin
+                                                for (int y = 0; y < cache_line_size; y++) begin
+                                                    if (x[3:0] == index[0] && y[1:0] == target_position[0]) begin
+                                                        cacheContext.cache_set_meta[x].cache_line_meta[y].dirty = 1;
+                                                    end
+                                                end
+                                            end
+                                            
                                         end
                                         if (CacheContext.busy_req.addr[31:2] == in_dreq[0].addr[31:2] && (|strobe_i4[2])) begin
                                             in_dresp[0].data = dcresp.data;
@@ -977,22 +1154,34 @@ module DCache (
                                    
                                 end
                                 2'b01, 2'b11: begin
-                                    ram_switch[{index[1], offset[1]}].en = 1;
-                                    ram_switch[{index[1], offset[1]}].offset = target_position[1];
+                                    for (int m = 0; m < cache_set_size * cacheline_words; m++) begin
+                                        if (m[7:0] == {index[1], offset[1]}) begin
+                                            ram_switch[m].en = 1;
+                                            ram_switch[m].offset = target_position[1];
+                                        end
+                                    end
+                                    
                                     if (busy_offset == offset[1]) begin
-                                        
                                         in_dresp[1].data_ok = 1'b1;
                                         in_dresp[1].addr_ok = 1'b1;
-                                        
-                                        
-                                        
                                         if (|strobe_i4[1]) begin
                                             for (int i = 0; i < 4; i++) begin
                                                 if (strobe_i4[1][i] == 1'b1) begin
-                                                    ram_switch[{index[1], busy_offset}].wdata[(((i + 1) << 3) - 1)-:8] = in_dreq[1].data[(((i + 1) << 3) - 1)-:8];
+                                                    for (int m = 0; m < cache_set_size * cacheline_words; m++) begin
+                                                        if (m[7:0] == {index[1], busy_offset}) begin
+                                                            ram_switch[m].wdata[(((i + 1) << 3) - 1)-:8] = in_dreq[1].data[(((i + 1) << 3) - 1)-:8];
+                                                        end
+                                                    end
                                                 end
                                             end
-                                            cacheContext.cache_set_meta[index[1]].cache_line_meta[target_position[1]].dirty = 1;
+                                            for (int x = 0; x < cache_set_size; x++) begin
+                                                for (int y = 0; y < cache_line_size; y++) begin
+                                                    if (x[3:0] == index[1] && y[1:0] == target_position[1]) begin
+                                                        cacheContext.cache_set_meta[x].cache_line_meta[y].dirty = 1;
+                                                    end
+                                                end
+                                            end
+                                            
                                         end
                                         if (CacheContext.busy_req.addr == in_dreq[1].addr && (|strobe_i4[2])) begin
                                             in_dresp[1].data = dcresp.data;
@@ -1034,8 +1223,13 @@ module DCache (
                                     
                                 end
                                 2'b01, 2'b11: begin
-                                    ram_switch[{index[0], offset[0]}].en = 1;
-                                    ram_switch[{index[0], offset[0]}].offset = target_position[0];
+                                    for (int m = 0; m < cache_set_size * cacheline_words; m++) begin
+                                        if (m[7:0] == {index[0], offset[0]}) begin
+                                            ram_switch[m].en = 1;
+                                            ram_switch[m].offset = target_position[0];
+                                        end
+                                    end
+                                    
                                     
                                     if (busy_offset == offset[0]) begin
                                         in_dresp[0].data_ok = 1'b1;
@@ -1045,10 +1239,20 @@ module DCache (
                                         if (|strobe_i4[0]) begin
                                             for (int i = 0; i < 4; i++) begin
                                                 if (strobe_i4[0][i] == 1'b1) begin
-                                                    ram_switch[{index[0], busy_offset}].wdata[(((i + 1) << 3) - 1)-:8] = in_dreq[0].data[(((i + 1) << 3) - 1)-:8];
+                                                    for (int m = 0; m < cache_set_size * cacheline_words; m++) begin
+                                                        if (m[7:0] == {index[0], busy_offset}) begin
+                                                            ram_switch[m].wdata[(((i + 1) << 3) - 1)-:8] = in_dreq[0].data[(((i + 1) << 3) - 1)-:8];
+                                                        end
+                                                    end
                                                 end
                                             end
-                                            cacheContext.cache_set_meta[index[0]].cache_line_meta[target_position[0]].dirty = 1;
+                                            for (int x = 0; x < cache_set_size; x++) begin
+                                                for (int y = 0; y < cache_line_size; y++) begin
+                                                    if (x[3:0] == index[0] && y[1:0] == target_position[0]) begin
+                                                        cacheContext.cache_set_meta[x].cache_line_meta[y].dirty = 1;
+                                                    end
+                                                end
+                                            end
                                         end
                                         if (CacheContext.busy_req.addr[31:2] == in_dreq[0].addr[31:2] && (|strobe_i4[2])) begin
                                             in_dresp[0].data = dcresp.data;
@@ -1085,8 +1289,13 @@ module DCache (
                                    
                                 end
                                 2'b01, 2'b11: begin
-                                    ram_switch[{index[1], offset[1]}].en = 1;
-                                    ram_switch[{index[1], offset[1]}].offset = target_position[1];
+                                    for (int m = 0; m < cache_set_size * cacheline_words; m++) begin
+                                        if (m[7:0] == {index[1], offset[1]}) begin
+                                            ram_switch[m].en = 1;
+                                            ram_switch[m].offset = target_position[1];
+                                        end
+                                    end
+                                    
                                     if (busy_offset == offset[1]) begin
                                         
                                         in_dresp[1].data_ok = 1'b1;
@@ -1097,10 +1306,21 @@ module DCache (
                                         if (|strobe_i4[1]) begin
                                             for (int i = 0; i < 4; i++) begin
                                                 if (strobe_i4[1][i] == 1'b1) begin
-                                                    ram_switch[{index[1], busy_offset}].wdata[(((i + 1) << 3) - 1)-:8] = in_dreq[1].data[(((i + 1) << 3) - 1)-:8];
+                                                    for (int m = 0; m < cache_set_size * cacheline_words; m++) begin
+                                                        if (m[7:0] == {index[1], busy_offset}) begin
+                                                            ram_switch[m].wdata[(((i + 1) << 3) - 1)-:8] = in_dreq[1].data[(((i + 1) << 3) - 1)-:8];
+                                                        end
+                                                    end
+                                                    
                                                 end
                                             end
-                                            cacheContext.cache_set_meta[index[1]].cache_line_meta[target_position[1]].dirty = 1;
+                                            for (int x = 0; x < cache_set_size; x++) begin
+                                                for (int y = 0; y < cache_line_size; y++) begin
+                                                    if (x[3:0] == index[1] && y[1:0] == target_position[1]) begin
+                                                        cacheContext.cache_set_meta[x].cache_line_meta[y].dirty = 1;
+                                                    end
+                                                end
+                                            end
                                         end
                                         if (CacheContext.busy_req.addr == in_dreq[1].addr && (|strobe_i4[2])) begin
                                             in_dresp[1].data = dcresp.data;
@@ -1139,8 +1359,13 @@ module DCache (
                                     
                                 end
                                 2'b01, 2'b11: begin
-                                    ram_switch[{index[0], offset[0]}].en = 1;
-                                    ram_switch[{index[0], offset[0]}].offset = target_position[0];
+                                    for (int m = 0; m < cache_set_size * cacheline_words; m++) begin
+                                        if (m[7:0] == {index[0], offset[0]}) begin
+                                            ram_switch[m].en = 1;
+                                            ram_switch[m].offset = target_position[0];
+                                        end
+                                    end
+                                    
                                     
                                     if (busy_offset == offset[0]) begin
                                         in_dresp[0].data_ok = 1'b1;
@@ -1150,10 +1375,20 @@ module DCache (
                                         if (|strobe_i4[0]) begin
                                             for (int i = 0; i < 4; i++) begin
                                                 if (strobe_i4[0][i] == 1'b1) begin
-                                                    ram_switch[{index[0], busy_offset}].wdata[(((i + 1) << 3) - 1)-:8] = in_dreq[0].data[(((i + 1) << 3) - 1)-:8];
+                                                    for (int m = 0; m < cache_set_size * cacheline_words; m++) begin
+                                                        if (m[7:0] == {index[0], busy_offset}) begin
+                                                            ram_switch[m].wdata[(((i + 1) << 3) - 1)-:8] = in_dreq[0].data[(((i + 1) << 3) - 1)-:8];
+                                                        end
+                                                    end
                                                 end
                                             end
-                                            cacheContext.cache_set_meta[index[0]].cache_line_meta[target_position[0]].dirty = 1;
+                                            for (int x = 0; x < cache_set_size; x++) begin
+                                                for (int y = 0; y < cache_line_size; y++) begin
+                                                    if (x[3:0] == index[0] && y[1:0] == target_position[0]) begin
+                                                        cacheContext.cache_set_meta[x].cache_line_meta[y].dirty = 1;
+                                                    end
+                                                end
+                                            end
                                         end
                                         if (CacheContext.busy_req.addr[31:2] == in_dreq[0].addr[31:2] && (|strobe_i4[2])) begin
                                             in_dresp[0].data = dcresp.data;
@@ -1189,7 +1424,12 @@ module DCache (
                     if (CacheContext.offset == 4'hf) begin // !dcresp.last
                         cacheContext.stat = SC_IDLE;
                         cacheContext.offset = '0;
-                        cacheContext.cache_set_meta[index[2]].flush_position = CacheContext.cache_set_meta[index[2]].flush_position + 1;
+                        for (int x = 0; x < cache_set_size; x++) begin
+                            if (x[3:0] == index[2]) begin
+                                cacheContext.cache_set_meta[x].flush_position = CacheContext.cache_set_meta[x].flush_position + 1;
+                            end
+                        end
+                        
                     end
                     else begin
                         cacheContext.offset = CacheContext.offset + 1;
@@ -1197,17 +1437,23 @@ module DCache (
                 end
             end
             SC_FLUSH: begin
-                ram_switch[{index[2], busy_offset}].en = 1;
-                ram_switch[{index[2], busy_offset}].offset = flush_position[2];
-                ram_switch[{index[2], busy_offset}].strobe = '0;
-                ram_switch[{index[2], busy_offset}].wdata = '0;
+                for (int m = 0; m < cache_set_size * cacheline_words; m++) begin
+                    if (m[7:0] == {index[2], busy_offset}) begin
+                        ram_switch[m].en = 1;
+                        ram_switch[m].offset = flush_position[2];
+                        ram_switch[m].strobe = '0;
+                        ram_switch[m].wdata = '0;
+                        
+                    end
+                end
+                dcreq.data = ram_rdata[{index[2], busy_offset}];
                 cacheContext.stat = SC_FLUSH;
                 dcreq.valid = 1;
                 dcreq.is_write = 1;
                 dcreq.size = MSIZE4;
                 dcreq.addr = flush_addr;
                 dcreq.strobe = 4'b1111;
-                dcreq.data = ram_rdata[{index[2], busy_offset}];
+                
                 dcreq.len = MLEN16;
                 if (dcresp.ready) begin
                     if (busy_offset != 4'hf) begin // !dcresp.last
