@@ -124,9 +124,9 @@ parameter Icache_context_t ICACHE_CONTEXT_RESET = '{
     in_dresp[M].data = ram_rdata[{index[M], offset[M]}];\
     in_dresp[M].addr_ok = 1'b1;\
     in_dresp[M].data_ok = 1'b1;\
-    cacheContext.resp[M].data = ram_rdata[{index[M], offset[M]}];\
-    cacheContext.resp[M].addr_ok = 1'b1;\
-    cacheContext.resp[M].data_ok = 1'b1;\
+    // cacheContext.resp[M].data = ram_rdata[{index[M], offset[M]}];\
+    // cacheContext.resp[M].addr_ok = 1'b1;\
+    // cacheContext.resp[M].data_ok = 1'b1;\
     if (|strobe_i4[M]) begin\
         cacheContext.cache_set_meta[index[M]].cache_line_meta[target_position[M]].dirty = 1'b1;\
     end
