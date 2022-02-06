@@ -18,11 +18,11 @@ module Write (
     
     always_comb begin
         WriteStat = 2'b11;
-        
+        /*
         if (WriteContext.valid2) begin
             WriteStat.valid = 0;
             WriteStat.ready = 0;
-        end
+        end*/
     end
     
     addr_t w_pc /* verilator public_flat_rd */;
@@ -46,13 +46,13 @@ module Write (
         commonContext_0.cp0.Cause.IP[7] = ext_int[5] || CommonContext.cp0.Cause.TI;
         commonContext_0.cp0.Cause.IP[6:2] = ext_int[4:0];
 
-        // æ¯ä¸ªå‘¨æœŸç»“æŸåæ›´æ–°å¹¶åˆ¤æ–­æ˜¯å¦éœ€è¦ä¸­æ–­
+        // Ã¿¸öÖÜÆÚ½áÊøºó¸üĞÂ²¢ÅĞ¶ÏÊÇ·ñĞèÒªÖĞ¶Ï
         // set external interrupts
         // invoke timer interrupt at the next cycle
         if (commonContext_0.cp0.Count + 1 == CommonContext.cp0.Compare)
-            // ä¸æ¶‰åŠè¿™ä¸ªå¼‚å¸¸ï¼Œæ‰€ä»¥å…ˆä¸ç®¡äº†ã€‚
-            // å¯èƒ½ä¼šå½±å“åˆ°å‰åºæŒ‡ä»¤çš„æ‰§è¡Œã€‚
-            // å¦‚æœè¦ THROW ä¸€ä¸ªå¼‚å¸¸çš„è¯ï¼Œåº”å½“æ”¾åˆ° Fetch é˜¶æ®µï¼Ÿ
+            // ²»Éæ¼°Õâ¸öÒì³££¬ËùÒÔÏÈ²»¹ÜÁË¡£
+            // ¿ÉÄÜ»áÓ°Ïìµ½Ç°ĞòÖ¸ÁîµÄÖ´ĞĞ¡£
+            // Èç¹ûÒª THROW Ò»¸öÒì³£µÄ»°£¬Ó¦µ±·Åµ½ Fetch ½×¶Î£¿
             commonContext_0.cp0.Cause.TI = 1;
 
         // increment Count
@@ -74,6 +74,7 @@ module Write (
     Write_Jmp Write_Jmp_inst_2(.WriteContext(WriteContext.write_2), .CommonContext(commonContext), .writeJmp(writeJmp_2));
     
     always_comb begin
+        /*
         if (WriteContext.valid2) begin
             commonContext = CommonContext;
             writeJmp_fwd = '0;
@@ -85,7 +86,7 @@ module Write (
                           !WriteContext.write_1.exception.valid && 
                           WriteContext.write_1.write_reg.dst != '0}};
         end
-        else begin
+        else*/ begin
             if (WriteContext.write_1.exception.valid || WriteContext.write_1.op == ERET)
                 commonContext = commonContext_1;
             else
@@ -108,9 +109,9 @@ module Write (
         // Write
         if(~resetn)
             WriteContext <= WRITE_CONTEXT_RESET;
-        else if (WriteStat.ready == 0) begin
+        /*else if (WriteStat.ready == 0) begin
             WriteContext.valid2 <= 0;
-        end
+        end*/
         else begin
             WriteContext.valid2 <= memory2write_1.op != NOP;
             WriteContext.write_1 <= memory2write_1;
